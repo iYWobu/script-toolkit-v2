@@ -1,4 +1,4 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name         巨量引擎-批量上传短剧 V5.1 API直传优化版
 // @namespace    https://github.com/iYWobu/script-toolkit-v2
 // @version      5.3.0
@@ -13,8 +13,9 @@
 // @grant        GM_xmlhttpRequest
 // @connect      raw.githubusercontent.com
 // @connect      gitee.com
-// @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E-%E6%89%B9%E9%87%8F%E4%B8%8A%E4%BC%A0%E7%9F%AD%E5%89%A7V5.1API%E7%9B%B4%E4%BC%A0%E4%BC%98%E5%8C%96%E7%89%88.user.js
-// @downloadURL https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E-%E6%89%B9%E9%87%8F%E4%B8%8A%E4%BC%A0%E7%9F%AD%E5%89%A7V5.1API%E7%9B%B4%E4%BC%A0%E4%BC%98%E5%8C%96%E7%89%88.user.js
+// @connect      *
+// @updateURL   https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E-%E6%89%B9%E9%87%8F%E4%B8%8A%E4%BC%A0%E7%9F%AD%E5%89%A7V5.1API%E7%9B%B4%E4%BC%A0%E4%BC%98%E5%8C%96%E7%89%88.user.js
+// @downloadURL https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E-%E6%89%B9%E9%87%8F%E4%B8%8A%E4%BC%A0%E7%9F%AD%E5%89%A7V5.1API%E7%9B%B4%E4%BC%A0%E4%BC%98%E5%8C%96%E7%89%88.user.js
 // @run-at       document-idle
 // ==/UserScript==
 
