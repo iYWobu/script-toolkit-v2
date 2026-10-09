@@ -1,4 +1,4 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name         巨量引擎-短剧漫剧ID精准获取工具
 // @namespace    https://business.oceanengine.com/
 // @version      11.9.3
@@ -10,8 +10,9 @@
 // @grant        unsafeWindow
 // @connect      raw.githubusercontent.com
 // @connect      gitee.com
-// @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E-%E7%9F%AD%E5%89%A7%E6%BC%AB%E5%89%A7ID%E7%B2%BE%E5%87%86%E8%8E%B7%E5%8F%96%E5%B7%A5%E5%85%B7.user.js
-// @downloadURL https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E-%E7%9F%AD%E5%89%A7%E6%BC%AB%E5%89%A7ID%E7%B2%BE%E5%87%86%E8%8E%B7%E5%8F%96%E5%B7%A5%E5%85%B7.user.js
+// @connect      *
+// @updateURL   https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E-%E7%9F%AD%E5%89%A7%E6%BC%AB%E5%89%A7ID%E7%B2%BE%E5%87%86%E8%8E%B7%E5%8F%96%E5%B7%A5%E5%85%B7.user.js
+// @downloadURL https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E-%E7%9F%AD%E5%89%A7%E6%BC%AB%E5%89%A7ID%E7%B2%BE%E5%87%86%E8%8E%B7%E5%8F%96%E5%B7%A5%E5%85%B7.user.js
 // ==/UserScript==
 
 (function () {
