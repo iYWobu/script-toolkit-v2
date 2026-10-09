@@ -1,4 +1,4 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name         畅读推广平台 - 短剧数据助手 (IAA极速版)
 // @namespace    https://github.com/iYWobu/script-toolkit-v2
 // @version      11.9.3
@@ -11,8 +11,9 @@
 // @grant        unsafeWindow
 // @connect      raw.githubusercontent.com
 // @connect      gitee.com
-// @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E7%95%85%E8%AF%BB%E6%8E%A8%E5%B9%BF%E5%B9%B3%E5%8F%B0-%E7%9F%AD%E5%89%A7%E6%95%B0%E6%8D%AE%E5%8A%A9%E6%89%8B(IAA%E6%9E%81%E9%80%9F%E7%89%88).user.js
-// @downloadURL https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E7%95%85%E8%AF%BB%E6%8E%A8%E5%B9%BF%E5%B9%B3%E5%8F%B0-%E7%9F%AD%E5%89%A7%E6%95%B0%E6%8D%AE%E5%8A%A9%E6%89%8B(IAA%E6%9E%81%E9%80%9F%E7%89%88).user.js
+// @connect      *
+// @updateURL   https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E7%95%85%E8%AF%BB%E6%8E%A8%E5%B9%BF%E5%B9%B3%E5%8F%B0-%E7%9F%AD%E5%89%A7%E6%95%B0%E6%8D%AE%E5%8A%A9%E6%89%8B(IAA%E6%9E%81%E9%80%9F%E7%89%88).user.js
+// @downloadURL https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E7%95%85%E8%AF%BB%E6%8E%A8%E5%B9%BF%E5%B9%B3%E5%8F%B0-%E7%9F%AD%E5%89%A7%E6%95%B0%E6%8D%AE%E5%8A%A9%E6%89%8B(IAA%E6%9E%81%E9%80%9F%E7%89%88).user.js
 // ==/UserScript==
 
 (function () {
