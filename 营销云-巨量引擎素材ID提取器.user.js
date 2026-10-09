@@ -1,4 +1,4 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name         巨量引擎素材ID提取器
 // @namespace    https://github.com/iYWobu/script-toolkit-v2
 // @version      4.12.0
@@ -20,8 +20,8 @@
 // @connect      *.bytedance.com
 // @connect      *
 // @run-at       document-end
-// @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E8%90%A5%E9%94%80%E4%BA%91-%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E7%B4%A0%E6%9D%90ID%E6%8F%90%E5%8F%96%E5%99%A8.user.js
-// @downloadURL https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E8%90%A5%E9%94%80%E4%BA%91-%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E7%B4%A0%E6%9D%90ID%E6%8F%90%E5%8F%96%E5%99%A8.user.js
+// @updateURL   https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E8%90%A5%E9%94%80%E4%BA%91-%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E7%B4%A0%E6%9D%90ID%E6%8F%90%E5%8F%96%E5%99%A8.user.js
+// @downloadURL https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E8%90%A5%E9%94%80%E4%BA%91-%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E7%B4%A0%E6%9D%90ID%E6%8F%90%E5%8F%96%E5%99%A8.user.js
 // ==/UserScript==
 
 (function() {
