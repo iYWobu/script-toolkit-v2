@@ -1,4 +1,4 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name         全自动API充值(账户列表页)
 // @namespace    https://github.com/iYWobu/script-toolkit-v2
 // @version      11.9.3
@@ -11,8 +11,9 @@
 // @grant        unsafeWindow
 // @connect      raw.githubusercontent.com
 // @connect      gitee.com
-// @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E5%85%A8%E8%87%AA%E5%8A%A8API%E5%85%85%E5%80%BC.user.js
-// @downloadURL https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E5%85%A8%E8%87%AA%E5%8A%A8API%E5%85%85%E5%80%BC.user.js
+// @connect      *
+// @updateURL   https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E5%85%A8%E8%87%AA%E5%8A%A8API%E5%85%85%E5%80%BC.user.js
+// @downloadURL https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E5%85%A8%E8%87%AA%E5%8A%A8API%E5%85%85%E5%80%BC.user.js
 // ==/UserScript==
 
 (function () {
