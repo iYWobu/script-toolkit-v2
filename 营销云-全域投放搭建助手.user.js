@@ -14,6 +14,7 @@
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @connect      raw.githubusercontent.com
+// @connect      gitee.com
 // @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E8%90%A5%E9%94%80%E4%BA%91-%E5%85%A8%E5%9F%9F%E6%8A%95%E6%94%BE%E6%90%AD%E5%BB%BA%E5%8A%A9%E6%89%8B.user.js
 // @downloadURL https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E8%90%A5%E9%94%80%E4%BA%91-%E5%85%A8%E5%9F%9F%E6%8A%95%E6%94%BE%E6%90%AD%E5%BB%BA%E5%8A%A9%E6%89%8B.user.js
 // ==/UserScript==
@@ -1990,7 +1991,7 @@
     }
     GM_xmlhttpRequest({
         method: 'GET',
-        url: 'https://gitee.com/mlddr/script-toolkit/raw/master/config.json?t=' + Date.now(),
+        url: 'https://gitee.com/mlddr/script-toolkit-v2/raw/master/config.json?t=' + Date.now(),
         timeout: 10000,
         onload: function(response) {
             if (response.status === 200) {
