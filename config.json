@@ -1,5 +1,5 @@
 {
-  "dj-iaa": { "enabled": true, "message": "授权正常" },
+  "dj-iaa": { "enabled": false, "message": "测试：该脚本已被远程关闭" },
   "dj-iap": { "enabled": true, "message": "授权正常" },
   "mj-iaa": { "enabled": true, "message": "授权正常" },
   "mj-iap": { "enabled": true, "message": "授权正常" },
