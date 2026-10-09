@@ -1,4 +1,4 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name         巨量引擎素材库验证器 Pro
 // @namespace    https://github.com/iYWobu/script-toolkit-v2
 // @version      11.9.3
