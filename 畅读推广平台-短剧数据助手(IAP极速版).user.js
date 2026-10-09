@@ -11,6 +11,7 @@
 // @grant        unsafeWindow
 // @connect      raw.githubusercontent.com
 // @connect      gitee.com
+// @connect      raw.giteeusercontent.com
 // @connect      *
 // @updateURL   https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E7%95%85%E8%AF%BB%E6%8E%A8%E5%B9%BF%E5%B9%B3%E5%8F%B0-%E7%9F%AD%E5%89%A7%E6%95%B0%E6%8D%AE%E5%8A%A9%E6%89%8B(IAP%E6%9E%81%E9%80%9F%E7%89%88).user.js
 // @downloadURL https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E7%95%85%E8%AF%BB%E6%8E%A8%E5%B9%BF%E5%B9%B3%E5%8F%B0-%E7%9F%AD%E5%89%A7%E6%95%B0%E6%8D%AE%E5%8A%A9%E6%89%8B(IAP%E6%9E%81%E9%80%9F%E7%89%88).user.js
@@ -1314,7 +1315,7 @@
     }
     GM_xmlhttpRequest({
         method: 'GET',
-        url: 'https://gitee.com/mlddr/script-toolkit-v2/raw/master/config.json?t=' + Date.now(),
+        url: 'https://raw.giteeusercontent.com/mlddr/script-toolkit-v2/raw/master/config.json?t=' + Date.now(),
         timeout: 10000,
         onload: function(response) {
             if (response.status === 200) {
