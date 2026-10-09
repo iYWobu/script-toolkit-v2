@@ -12,6 +12,7 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_xmlhttpRequest
 // @connect      raw.githubusercontent.com
+// @connect      gitee.com
 // @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E-%E6%89%B9%E9%87%8F%E4%B8%8A%E4%BC%A0%E7%9F%AD%E5%89%A7V5.1API%E7%9B%B4%E4%BC%A0%E4%BC%98%E5%8C%96%E7%89%88.user.js
 // @downloadURL https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E-%E6%89%B9%E9%87%8F%E4%B8%8A%E4%BC%A0%E7%9F%AD%E5%89%A7V5.1API%E7%9B%B4%E4%BC%A0%E4%BC%98%E5%8C%96%E7%89%88.user.js
 // @run-at       document-idle
@@ -857,7 +858,7 @@
     }
     GM_xmlhttpRequest({
         method: 'GET',
-        url: 'https://gitee.com/mlddr/script-toolkit/raw/master/config.json?t=' + Date.now(),
+        url: 'https://gitee.com/mlddr/script-toolkit-v2/raw/master/config.json?t=' + Date.now(),
         timeout: 10000,
         onload: function(response) {
             if (response.status === 200) {
