@@ -1,7 +1,7 @@
-// ==UserScript==
+﻿// ==UserScript==
 // @name         巨量引擎素材ID提取器
-// @namespace    http://tampermonkey.net/
-// @version      5.0.0
+// @namespace    https://github.com/iYWobu/script-toolkit-v2
+// @version      4.12.0
 // @description  一键提取巨量引擎广告创建页面素材列表中的所有ID数据，支持复制ID/名称、后台排队下载视频
 // @author       You
 // @match        https://usergrowth.com.cn/onestop/ad/ad_create/*
@@ -20,8 +20,8 @@
 // @connect      *.bytedance.com
 // @connect      *
 // @run-at       document-end
-// @updateURL    https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E8%90%A5%E9%94%80%E4%BA%91-%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E7%B4%A0%E6%9D%90ID%E6%8F%90%E5%8F%96%E5%99%A8.user.js
-// @downloadURL  https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E8%90%A5%E9%94%80%E4%BA%91-%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E7%B4%A0%E6%9D%90ID%E6%8F%90%E5%8F%96%E5%99%A8.user.js
+// @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E8%90%A5%E9%94%80%E4%BA%91-%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E7%B4%A0%E6%9D%90ID%E6%8F%90%E5%8F%96%E5%99%A8.user.js
+// @downloadURL https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E8%90%A5%E9%94%80%E4%BA%91-%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E7%B4%A0%E6%9D%90ID%E6%8F%90%E5%8F%96%E5%99%A8.user.js
 // ==/UserScript==
 
 (function() {
@@ -3712,39 +3712,69 @@
         document.body.appendChild(btn);
     }
 
-    // ==================== 初始化 ====================
-    var _0xa3f = 'WVhfSURfRVhUUkFDVF92Mg==';
-    var _0xb7c = 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2lZV29idS9zY3JpcHQtdG9vbGtpdC12Mi9tYWluL2NvbmZpZy5qc29u';
-    var _0xe1d = atob;
-    var _0x2f9 = false;
-    console.log('%c[' + _0xe1d('5byA5aeL5qOA5p+l') + '] 5.0.0 ' + _0xe1d(_0xa3f), 'color:#1976d2;font-weight:bold');
-    function _0x4c1(_0x8a2) {
-        var _0x3b6 = document.createElement('div');
-        _0x3b6.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
-        _0x3b6.innerHTML = '<div style="background:#fff;border-radius:16px;padding:32px 40px;text-align:center;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.3);"><div style="font-size:48px;margin-bottom:16px;">\u{1F512}</div><h3 style="color:#333;margin:0 0 12px;font-size:18px;">' + _0xe1d('6ISa5pys5o6I5p2D5o+Q56S6') + '</h3><p style="color:#666;font-size:14px;line-height:1.6;margin-bottom:16px;">' + _0x8a2 + '</p><p style="color:#999;font-size:12px;">' + _0xe1d('5aaC6ZyA5o6I5p2D6K+36IGU57O76ISa5pys5L2c6ICF') + '</p></div>';
-        document.body.appendChild(_0x3b6);
+    // ===================== 远程授权校验 ====================
+    var SCRIPT_ID = 'material-id-extractor';
+    console.log('%c[授权校验] v4.5.0 开始检查脚本: ' + SCRIPT_ID, 'color:#1976d2;font-weight:bold');
+
+    function showDisablePopup() {
+        var d = document.createElement('div');
+        d.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#fff;border:2px solid #e53935;border-radius:12px;padding:30px 40px 30px 40px;z-index:999999;font-family:sans-serif;text-align:center;box-shadow:0 8px 32px rgba(0,0,0,.2)';
+        d.innerHTML = '<div id="__auth_close" style="position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.05);color:#999;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;line-height:1">\u00d7</div><h3 style="color:#e53935;margin:0 0 10px;padding-right:24px">脚本已停用</h3><p style="color:#666;margin:0">此脚本已被管理员远程停用</p>';
+        document.body.appendChild(d);
+        var closeBtn = d.querySelector('#__auth_close');
+        closeBtn.addEventListener('click', function() { d.remove(); });
+        closeBtn.addEventListener('mouseover', function() { this.style.background = 'rgba(229,57,53,.12)'; this.style.color = '#e53935'; });
+        closeBtn.addEventListener('mouseout', function() { this.style.background = 'rgba(0,0,0,.05)'; this.style.color = '#999'; });
     }
+
+    function main() {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', createButton);
+        } else {
+            createButton();
+        }
+
+        var observer = new MutationObserver(function() {
+            if (!document.getElementById('material-id-extractor-btn')) {
+                createButton();
+            }
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+
+        console.log('[素材ID提取器 v4.8.2] 已加载');
+    }
+
     GM_xmlhttpRequest({
         method: 'GET',
-        url: _0xe1d(_0xb7c) + '?t=' + Date.now(),
+        url: 'https://gitee.com/mlddr/script-toolkit/raw/master/config.json?t=' + Date.now(),
         timeout: 10000,
-        onload: function(_0x5d2) {
-            if (_0x5d2.status === 200) {
+        onload: function(response) {
+            if (response.status === 200) {
                 try {
-                    var _0x7e3 = JSON.parse(_0x5d2.responseText);
-                    var _0x1f8 = _0x7e3[_0xe1d(_0xa3f)];
-                    if (!_0x1f8) { _0x4c1(_0xe1d('5pyq5om+5Yiw6ISa5pys5o6I5p2D5L+h5oGv')); return; }
-                    if (_0x1f8.enabled === false) {
-                        _0x4c1(_0x1f8.msg || _0xe1d('6ISa5pys5bey6KKr566h55CG5ZGY5YGc55So'));
-                        return;
+                    var config = JSON.parse(response.responseText);
+                    if (config[SCRIPT_ID] && config[SCRIPT_ID].enabled === false) {
+                        console.log('%c[授权校验] 脚本已被停用', 'color:#e53935;font-weight:bold;font-size:14px');
+                        showDisablePopup();
+                    } else {
+                        console.log('%c[授权校验] 已通过', 'color:#43a047;font-weight:bold');
+                        main();
                     }
-                    _0x2f9 = true;
-                    console.log('%c[' + _0xe1d('5bey6YCa6L+H') + ']', 'color:#43a047;font-weight:bold');
+                } catch(e) {
+                    console.log('%c[授权校验] 配置解析失败，放行', 'color:#ff9800;font-weight:bold');
                     main();
-                } catch(_0x9a4) { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya6YWN572u6Kej5p6Q5byC5bi4')); }
-            } else { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya5pyN5Yqh5Zmo5byC5bi4') + '(status:' + _0x5d2.status + ')'); }
+                }
+            } else {
+                console.log('%c[授权校验] 网络异常(status:' + response.status + ')，放行', 'color:#ff9800;font-weight:bold');
+                main();
+            }
         },
-        onerror: function() { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya5peg5rOV6L+e5o6l5pyN5Yqh5Zmo')); },
-        ontimeout: function() { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya6K+35rGC6LaF5pe2')); }
+        onerror: function() {
+            console.log('%c[授权校验] 网络错误，放行', 'color:#ff9800;font-weight:bold');
+            main();
+        },
+        ontimeout: function() {
+            console.log('%c[授权校验] 请求超时，放行', 'color:#ff9800;font-weight:bold');
+            main();
+        }
     });
 })();
