@@ -1,0 +1,1416 @@
+﻿// ==UserScript==
+// @name         畅读推广平台 - 漫剧数据助手 (IAP极速版)
+// @namespace    http://tampermonkey.net/
+// @version      12.0.0
+// @description  漫剧IAP极速版：XHR直调+5并发搜索+4并发创建+ID/名称双模式搜索+错峰请求+补漏验证+180天链接查询+无链接原因显示+标点归一化匹配+重名剧目选择+创建失败重试+按金额档位优先+超小额>超超小额>小额>中额+兼容pay/ad双字段+虚拟滚动支持5000条
+// @author       Work Assistant
+// @match        https://www.changdupingtai.com/*
+// @require      https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js
+// @run-at       document-idle
+// @grant        GM_xmlhttpRequest
+// @grant        unsafeWindow
+// @connect      raw.githubusercontent.com
+// @connect      raw.githubusercontent.com
+// @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E7%95%85%E8%AF%BB%E6%8E%A8%E5%B9%BF%E5%B9%B3%E5%8F%B0-%E6%BC%AB%E5%89%A7%E6%95%B0%E6%8D%AE%E5%8A%A9%E6%89%8B(IAP%E6%9E%81%E9%80%9F%E7%89%88).user.js
+// @downloadURL https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E7%95%85%E8%AF%BB%E6%8E%A8%E5%B9%BF%E5%B9%B3%E5%8F%B0-%E6%BC%AB%E5%89%A7%E6%95%B0%E6%8D%AE%E5%8A%A9%E6%89%8B(IAP%E6%9E%81%E9%80%9F%E7%89%88).user.js
+// ==/UserScript==
+
+(function () {
+    'use strict';
+
+    function main() {
+
+    // ==================== 版本 ====================
+    const VERSION = '11.9.0';
+    const API_BASE = 'https://www.changdupingtai.com/novelsale/distributor';
+
+    // ==================== 样式（紫色系，区分短剧橙色/IAA绿色） ====================
+    const styleEl = document.createElement('style');
+    styleEl.textContent = `
+        #cd-mj-iap-panel {
+            position: fixed; top: 20px; right: 20px; width: 860px; max-height: 92vh;
+            background: linear-gradient(135deg, #f8f0ff 0%, #fff 40%, #f0f0ff 100%);
+            border: 2px solid #d8c8e8; border-radius: 16px;
+            box-shadow: 0 8px 40px rgba(140,100,180,.12), 0 2px 8px rgba(0,0,0,.04);
+            z-index: 99999; overflow: hidden; display: flex; flex-direction: column;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            transition: all .3s ease;
+        }
+        #cd-mj-iap-panel.minimized { width: 50px; height: 50px; max-height: 50px; border-radius: 50%; cursor: pointer; overflow: hidden; border-color: #7e57c2; }
+        #cd-mj-iap-panel.minimized *:not(#cd-toggle) { display: none !important; }
+        #cd-toggle { position: absolute; top: 8px; right: 10px; width: 30px; height: 30px; border: none; background: rgba(126,87,194,.12); border-radius: 50%; color: #7e57c2; font-size: 18px; cursor: pointer; z-index: 10; display: flex; align-items: center; justify-content: center; transition: all .2s; }
+        #cd-toggle:hover { background: rgba(126,87,194,.25); transform: scale(1.1); }
+        .cd-header { padding: 14px 20px 10px; background: linear-gradient(90deg, rgba(206,147,216,.15) 0%, rgba(179,157,219,.12) 100%); border-bottom: 1px solid #e0d0e8; }
+        .cd-header h3 { margin: 0; font-size: 16px; font-weight: 700; background: linear-gradient(135deg, #7e57c2, #9575cd); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .cd-header p { margin: 3px 0 0; font-size: 11px; color: #a890b8; }
+        .cd-search-area { padding: 14px 20px 10px; background: rgba(255,255,255,.6); border-bottom: 1px solid #e8e0f0; }
+        .cd-search-row { display: flex; gap: 8px; align-items: center; }
+        .cd-search-input { flex: 1; height: 38px; padding: 0 14px; border: 2px solid #d0c0e0; border-radius: 20px; font-size: 13px; color: #5a4a6a; outline: none; box-sizing: border-box; transition: all .2s; }
+        .cd-search-input:focus { border-color: #7e57c2; box-shadow: 0 0 0 3px rgba(126,87,194,.12); }
+        .cd-search-input::placeholder { color: #c0b0d0; }
+        .cd-btn { height: 38px; padding: 0 18px; border: none; border-radius: 20px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all .2s; white-space: nowrap; }
+        .cd-btn:disabled { opacity: .45; cursor: not-allowed; }
+        .cd-btn-primary { background: linear-gradient(135deg, #7e57c2, #9575cd); color: #fff; box-shadow: 0 2px 8px rgba(126,87,194,.3); }
+        .cd-btn-primary:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(126,87,194,.4); }
+        .cd-btn-clear { background: rgba(180,160,200,.15); color: #a090b0; }
+        .cd-btn-clear:hover:not(:disabled) { background: rgba(180,160,200,.25); }
+        .cd-btn-export { background: linear-gradient(135deg, #66bb6a, #43a047); color: #fff; box-shadow: 0 2px 8px rgba(76,175,80,.3); }
+        .cd-btn-export:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(76,175,80,.4); }
+        .cd-btn-icon { height: 38px; width: 38px; padding: 0; border: 2px solid #d0c0e0; border-radius: 20px; background: rgba(126,87,194,.08); color: #7e57c2; font-size: 16px; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; }
+        .cd-btn-icon:hover { background: rgba(126,87,194,.18); border-color: #7e57c2; transform: scale(1.05); }
+        .cd-btn-danger { background: linear-gradient(135deg, #ef5350, #e53935); color: #fff; box-shadow: 0 2px 8px rgba(239,83,80,.3); }
+        .cd-btn-danger:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(239,83,80,.4); }
+        .cd-btn-secondary { background: rgba(160,140,180,.12); color: #8a7a9a; }
+        .cd-btn-secondary:hover:not(:disabled) { background: rgba(160,140,180,.22); }
+        .cd-hint { margin-top: 6px; font-size: 11px; color: #a890b8; line-height: 1.5; }
+        .cd-hint b { color: #7e57c2; font-weight: 500; }
+        .cd-progress { margin-top: 8px; height: 4px; background: #e8e0f0; border-radius: 2px; overflow: hidden; display: none; }
+        .cd-progress-fill { height: 100%; width: 0%; background: linear-gradient(90deg, #7e57c2, #9575cd); border-radius: 2px; transition: width .3s; }
+        .cd-body { padding: 0; overflow-y: auto; flex: 1; }
+        .cd-table-wrap { margin: 0; max-height: calc(92vh - 280px); overflow: auto; position: relative; }
+        .cd-table { width: 100%; border-collapse: collapse; font-size: 12px; table-layout: fixed; }
+        .cd-table thead { position: sticky; top: 0; z-index: 2; }
+        .cd-table th { padding: 10px 4px; text-align: left; font-weight: 600; font-size: 11px; color: #6a5a7a; background: linear-gradient(135deg, #f5f0ff, #f0f4ff); border-bottom: 2px solid #d0c0e0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cd-table td { padding: 8px 4px; border-bottom: 1px solid #ede5f5; color: #5a4a6a; word-break: break-all; vertical-align: top; overflow: hidden; }
+        .cd-table tr { height: 44px; }
+        .cd-table tr.cd-virtual-spacer { height: auto; }
+        .cd-table tr.cd-virtual-spacer td { padding: 0; border: none; }
+        .cd-table tr:hover td { background: rgba(126,87,194,.04); }
+        .cd-table a { color: #7e57c2; text-decoration: none; transition: color .15s; }
+        .cd-table a:hover { color: #673ab7; text-decoration: underline; }
+        .cd-iap-link { display: block; margin: 1px 0; padding: 2px 8px; border-radius: 10px; background: linear-gradient(135deg, rgba(206,147,216,.12), rgba(179,157,219,.12)); border: 1px solid rgba(200,180,220,.25); font-size: 11px; line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .cd-iap-link .iap-label { display: inline-block; background: rgba(126,87,194,.15); color: #673ab7; padding: 0 6px; border-radius: 8px; font-size: 10px; margin-right: 4px; }
+        .cd-footer-bar { padding: 10px 20px; background: rgba(255,255,255,.6); border-top: 1px solid #e8e0f0; display: flex; align-items: center; justify-content: space-between; }
+        .cd-footer-left { font-size: 11px; color: #a890b8; }
+        .cd-footer-right { display: flex; gap: 8px; }
+        .cd-status-bar { padding: 8px 20px; background: linear-gradient(135deg, rgba(126,87,194,.06), rgba(179,157,219,.06)); border-top: 1px solid #e8e0f0; font-size: 11px; color: #a890b8; max-height: 60px; overflow-y: auto; line-height: 1.5; }
+        .cd-status-bar.ok { color: #66bb6a; }
+        .cd-status-bar.er { color: #ef5350; }
+        .cd-status-bar.inf { color: #42a5f5; }
+        .cd-empty { padding: 40px 20px; text-align: center; color: #d0c8d8; }
+        .cd-empty-icon { font-size: 36px; margin-bottom: 8px; opacity: .6; }
+        .cd-empty-text { font-size: 13px; }
+        .cd-empty-sub { font-size: 11px; color: #d0c8d8; margin-top: 4px; }
+        .cd-table-wrap::-webkit-scrollbar, .cd-body::-webkit-scrollbar { width: 0; height: 0; display: none; }
+        .cd-search-mode { position: relative; flex-shrink: 0; }
+        .cd-mode-btn { height: 38px; padding: 0 12px; border: 2px solid #d0c0e0; border-radius: 20px; background: rgba(126,87,194,.08); color: #7e57c2; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; transition: all .2s; display: flex; align-items: center; gap: 4px; }
+        .cd-mode-btn:hover { background: rgba(126,87,194,.18); border-color: #7e57c2; }
+        .cd-mode-btn .cd-mode-arrow { font-size: 10px; transition: transform .2s; }
+        .cd-mode-btn.open .cd-mode-arrow { transform: rotate(180deg); }
+        .cd-mode-dropdown { position: absolute; top: 42px; left: 0; min-width: 130px; background: #fff; border: 1px solid #d0c0e0; border-radius: 12px; box-shadow: 0 4px 16px rgba(0,0,0,.1); display: none; z-index: 100; overflow: hidden; }
+        .cd-mode-dropdown.show { display: block; animation: cdFadeIn .15s ease; }
+        .cd-mode-option { padding: 8px 14px; font-size: 13px; color: #5a4a6a; cursor: pointer; transition: all .15s; }
+        .cd-mode-option:hover { background: rgba(126,87,194,.08); }
+        .cd-mode-option.active { background: rgba(126,87,194,.12); color: #7e57c2; font-weight: 600; }
+        .cd-error-text { color: #ef5350; font-size: 11px; line-height: 1.4; }
+        .cd-batch-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,.35); z-index: 100000; display: flex; align-items: center; justify-content: center; animation: cdFadeIn .2s ease; }
+        .cd-batch-overlay.closing { animation: cdFadeOut .15s ease forwards; }
+        @keyframes cdFadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes cdFadeOut { from { opacity: 1; } to { opacity: 0; } }
+        .cd-batch-modal { width: 520px; background: #fff; border-radius: 16px; box-shadow: 0 12px 48px rgba(0,0,0,.18); overflow: hidden; animation: cdSlideIn .25s ease; }
+        .cd-batch-modal.closing { animation: cdSlideOut .15s ease forwards; }
+        @keyframes cdSlideIn { from { opacity: 0; transform: translateY(20px) scale(.97); } to { opacity: 1; transform: translateY(0) scale(1); } }
+        @keyframes cdSlideOut { from { opacity: 1; transform: translateY(0) scale(1); } to { opacity: 0; transform: translateY(20px) scale(.97); } }
+        .cd-batch-header { padding: 16px 20px 12px; border-bottom: 1px solid #e8e0f0; display: flex; align-items: center; justify-content: space-between; }
+        .cd-batch-header h4 { margin: 0; font-size: 15px; font-weight: 600; color: #5a4a6a; }
+        .cd-batch-header .cd-batch-counter { font-size: 12px; color: #a890b8; }
+        .cd-batch-header .cd-batch-close { width: 28px; height: 28px; border: none; border-radius: 50%; background: rgba(180,160,200,.12); color: #a090b0; font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+        .cd-batch-header .cd-batch-close:hover { background: rgba(180,160,200,.25); }
+        .cd-batch-hint { padding: 10px 20px 8px; font-size: 12px; color: #a890b8; line-height: 1.5; }
+        .cd-batch-hint b { color: #7e57c2; font-weight: 500; }
+        .cd-batch-textarea-wrap { padding: 0 20px; }
+        .cd-batch-textarea { width: 100%; height: 200px; padding: 12px 14px; border: 2px solid #d0c0e0; border-radius: 12px; font-size: 13px; color: #5a4a6a; line-height: 1.6; resize: vertical; outline: none; font-family: inherit; box-sizing: border-box; transition: border-color .2s; }
+        .cd-batch-textarea:focus { border-color: #7e57c2; box-shadow: 0 0 0 3px rgba(126,87,194,.12); }
+        .cd-batch-textarea::placeholder { color: #d0c8d8; }
+        .cd-batch-footer { padding: 12px 20px 16px; display: flex; align-items: center; justify-content: flex-end; gap: 10px; }
+        /* 极速版特有类 - 浅色主题适配 */
+        .cd-badge { display: inline-block; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 500; }
+        .cd-badge-ok { background: rgba(102,187,106,.15); color: #43a047; }
+        .cd-badge-err { background: rgba(239,83,80,.12); color: #e53935; }
+        .cd-badge-warn { background: rgba(251,192,45,.15); color: #f9a825; }
+        .cd-badge-info { background: rgba(126,87,194,.12); color: #7e57c2; }
+        .cd-btn-disabled-inline { height: 28px; padding: 0 10px; font-size: 11px; border: 1px solid #e0d0e8; border-radius: 14px; background: rgba(200,190,210,.1); color: #b0a0c0; cursor: not-allowed; display: inline-flex; align-items: center; white-space: nowrap; }
+        .cd-link-mismatch { border-color: rgba(251,192,45,.4) !important; background: linear-gradient(135deg, rgba(251,192,45,.08), rgba(251,192,45,.04)) !important; }
+        .cd-link-mismatch .iap-label { background: rgba(251,192,45,.15) !important; color: #f9a825 !important; }
+    `;
+    document.head.appendChild(styleEl);
+
+    // ==================== 创建面板 ====================
+    const panel = document.createElement('div');
+    panel.id = 'cd-mj-iap-panel';
+    panel.innerHTML = `
+        <button id="cd-toggle" title="最小化/展开">−</button>
+        <div class="cd-header">
+            <h3>漫剧数据助手 v11.9.0 极速版 (IAP)</h3>
+        </div>
+        <div class="cd-search-area">
+            <div class="cd-search-row">
+                <div class="cd-search-mode" id="cd-search-mode">
+                    <button class="cd-mode-btn" id="cd-mode-btn">名称 <span class="cd-mode-arrow">▼</span></button>
+                    <div class="cd-mode-dropdown" id="cd-mode-dropdown">
+                        <div class="cd-mode-option active" data-mode="name">按名称</div>
+                        <div class="cd-mode-option" data-mode="id">按剧目ID</div>
+                    </div>
+                </div>
+                <input class="cd-search-input" id="cd-search-input" placeholder="输入漫剧名称搜索（支持批量，每行一个）" autocomplete="off" />
+                <button class="cd-btn cd-btn-icon" id="cd-batch-search-btn" title="批量输入">☰</button>
+                <button class="cd-btn cd-btn-primary" id="cd-search-btn">极速搜索</button>
+                <button class="cd-btn cd-btn-clear" id="cd-clear-input-btn">清空</button>
+            </div>
+            <div class="cd-progress" id="cd-progress"><div class="cd-progress-fill" id="cd-progress-fill"></div></div>
+        </div>
+        <div class="cd-body">
+            <div class="cd-empty" id="cd-empty"><div class="cd-empty-icon">⚡</div><div class="cd-empty-text">暂无数据</div><div class="cd-empty-sub">输入漫剧名称或ID，点击极速搜索</div></div>
+            <div class="cd-table-wrap" id="cd-table-wrap" style="display:none"><table class="cd-table"><thead id="cd-thead"></thead><tbody id="cd-tbody"></tbody></table></div>
+        </div>
+        <div class="cd-footer-bar">
+            <div class="cd-footer-left" id="cd-footer-info">共 0 部漫剧</div>
+            <div class="cd-footer-right">
+                <button class="cd-btn cd-btn-danger" id="cd-stop-btn" style="display:none">停止</button>
+                <button class="cd-btn cd-btn-export" id="cd-export-btn" disabled>导出 Excel</button>
+                <button class="cd-btn cd-btn-secondary" id="cd-clear-all-btn" disabled>清空全部</button>
+            </div>
+        </div>
+        <div class="cd-status-bar" id="cd-status">漫剧IAP极速版v11.9.0已启动，等待搜索...</div>
+    `;
+    document.body.appendChild(panel);
+
+    // ==================== 状态 ====================
+    let dramaMap = {};
+    // ==================== 虚拟滚动配置 ====================
+    const VIRTUAL_CONFIG = {
+        maxItems: 5000,
+        rowHeight: 44,
+        bufferRows: 30,
+    };
+    const virtualState = {
+        startIndex: 0,
+        endIndex: 0,
+        scrollTop: 0,
+        _rafId: null,
+    };
+    let isWorking = false;
+    let stopRequested = false;
+    let searchMode = 'name'; // 'name' or 'id'
+    let authInfo = {
+        appid: '',
+        apptype: '',
+        distributorId: '',
+        adUserId: '',
+        AgwJsConv: 'str'
+    };
+
+    const searchInput = document.getElementById('cd-search-input');
+    const searchBtn = document.getElementById('cd-search-btn');
+    const clearInputBtn = document.getElementById('cd-clear-input-btn');
+    const progressEl = document.getElementById('cd-progress');
+    const progressFill = document.getElementById('cd-progress-fill');
+    const emptyEl = document.getElementById('cd-empty');
+    const tableWrap = document.getElementById('cd-table-wrap');
+    const thead = document.getElementById('cd-thead');
+    const tbody = document.getElementById('cd-tbody');
+    const footerInfo = document.getElementById('cd-footer-info');
+    const exportBtn = document.getElementById('cd-export-btn');
+    const clearAllBtn = document.getElementById('cd-clear-all-btn');
+    const stopBtn = document.getElementById('cd-stop-btn');
+    const statusEl = document.getElementById('cd-status');
+    const batchBtn = document.getElementById('cd-batch-search-btn');
+    const modeBtn = document.getElementById('cd-mode-btn');
+    const modeDropdown = document.getElementById('cd-mode-dropdown');
+
+    function log(msg, type) { statusEl.textContent = msg; statusEl.className = 'cd-status-bar ' + (type || ''); }
+    function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+    // ==================== XHR拦截：提取认证头 ====================
+    (function interceptXHR() {
+        const origOpen = XMLHttpRequest.prototype.open;
+        const origSend = XMLHttpRequest.prototype.send;
+        const origSetHeader = XMLHttpRequest.prototype.setRequestHeader;
+
+        XMLHttpRequest.prototype.open = function(method, url, ...args) {
+            this._cdUrl = url;
+            return origOpen.call(this, method, url, ...args);
+        };
+        XMLHttpRequest.prototype.setRequestHeader = function(name, value) {
+            const lname = name.toLowerCase();
+            if (lname === 'appid') authInfo.appid = value;
+            else if (lname === 'apptype') authInfo.apptype = value;
+            else if (lname === 'distributorid') authInfo.distributorId = value;
+            else if (lname === 'aduserid') authInfo.adUserId = value;
+            else if (lname === 'agw-js-conv') authInfo.AgwJsConv = value;
+            return origSetHeader.call(this, name, value);
+        };
+        XMLHttpRequest.prototype.send = function(body) {
+            return origSend.call(this, body);
+        };
+    })();
+
+    // ==================== API调用器 ====================
+    function apiHeaders() {
+        const h = { 'Accept': 'application/json, text/plain, */*' };
+        if (authInfo.appid) h['appid'] = authInfo.appid;
+        if (authInfo.apptype) h['apptype'] = authInfo.apptype;
+        if (authInfo.distributorId) h['distributorId'] = authInfo.distributorId;
+        if (authInfo.adUserId) h['adUserId'] = authInfo.adUserId;
+        if (authInfo.AgwJsConv) h['Agw-Js-Conv'] = authInfo.AgwJsConv;
+        return h;
+    }
+
+    function xhrRequest(method, path, params, body) {
+        return new Promise((resolve, reject) => {
+            const url = new URL(API_BASE + path, location.origin);
+            if (method === 'GET' && params) {
+                for (const [k, v] of Object.entries(params)) {
+                    url.searchParams.set(k, v);
+                }
+            }
+            url.searchParams.set('aweme_user_new_version', 'true');
+
+            const xhr = new XMLHttpRequest();
+            xhr.open(method, url.toString());
+            xhr.timeout = 15000;
+
+            const headers = apiHeaders();
+            for (const [k, v] of Object.entries(headers)) {
+                try { xhr.setRequestHeader(k, v); } catch(e) {}
+            }
+            if (method === 'POST' && body) {
+                try { xhr.setRequestHeader('Content-Type', 'application/json; charset=utf-8'); } catch(e) {}
+            }
+
+            xhr.onload = function() {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        resolve(JSON.parse(xhr.responseText));
+                    } catch(e) {
+                        reject(new Error('JSON解析失败: ' + xhr.responseText.substring(0, 100)));
+                    }
+                } else {
+                    reject(new Error(`API ${xhr.status}: ${xhr.statusText}`));
+                }
+            };
+            xhr.onerror = function() { reject(new Error('网络错误')); };
+            xhr.ontimeout = function() { reject(new Error('请求超时(15s)')); };
+
+            if (method === 'POST' && body) {
+                xhr.send(JSON.stringify(body));
+            } else {
+                xhr.send();
+            }
+        });
+    }
+
+    async function apiGet(path, params = {}) {
+        return xhrRequest('GET', path, params, null);
+    }
+
+    async function apiPost(path, body = {}) {
+        return xhrRequest('POST', path, null, body);
+    }
+
+    // ==================== 并发控制 ====================
+    async function batchConcurrent(items, concurrency, fn) {
+        const results = [];
+        let index = 0;
+        let completed = 0;
+        async function worker() {
+            while (index < items.length && !stopRequested) {
+                const i = index++;
+                try {
+                    results[i] = await fn(items[i], i);
+                } catch(e) {
+                    results[i] = { error: e.message };
+                }
+                completed++;
+                if (progressEl.style.display !== 'none') {
+                    progressFill.style.width = (completed / items.length * 100) + '%';
+                }
+            }
+        }
+        const workers = Array(Math.min(concurrency, items.length)).fill(0).map(() => worker());
+        await Promise.all(workers);
+        return results;
+    }
+
+    // ==================== 搜索API ====================
+    async function searchDramaRaw(query, retryCount = 0, searchType = 2) {
+        try {
+            const data = await apiGet('/content/series/list/v1/', {
+                search_type: searchType,
+                query: query,
+                sort_type: 1,
+                sort_field: 8,
+                page_index: 0,
+                page_size: 10
+            });
+            if (data.code === 4009 && retryCount < 4) {
+                const waitMs = 1000 * (retryCount + 1);
+                console.log(`[漫剧IAP搜索:${query}] 频率限制(4009)，${waitMs/1000}s后重试(${retryCount + 1}/4)`);
+                await sleep(waitMs);
+                return searchDramaRaw(query, retryCount + 1, searchType);
+            }
+            if (data.code === 4000 && retryCount < 2) {
+                console.log(`[漫剧IAP搜索:${query}] 参数错误(4000)，可能认证头未就绪，1s后重试(${retryCount + 1}/2)`);
+                await sleep(1000);
+                return searchDramaRaw(query, retryCount + 1, searchType);
+            }
+            return data;
+        } catch(e) {
+            if (retryCount < 3) {
+                const waitMs = 1000 * (retryCount + 1);
+                console.log(`[漫剧IAP搜索:${query}] 网络异常，${waitMs/1000}s后重试(${retryCount + 1}/3): ${e.message}`);
+                await sleep(waitMs);
+                return searchDramaRaw(query, retryCount + 1, searchType);
+            }
+            throw e;
+        }
+    }
+
+    // ==================== ID搜索 ====================
+    async function searchDramaById(bookId) {
+        try {
+            const data = await searchDramaRaw(bookId, 0, 1);
+            console.log(`[漫剧IAP ID搜索:${bookId}] code=${data.code}, msg=${data.message || ''}`);
+            if (data.code !== 0) {
+                return { error: data.message || `搜索失败(code=${data.code})` };
+            }
+            let list = data.data?.data || data.data?.list || data.data?.series_list || [];
+            if (!list || list.length === 0) {
+                return { error: '不存在' };
+            }
+            const match = list.find(item => String(item.book_id) === String(bookId)) || list[0];
+            const av = match.aweme_version_book_data || {};
+            return {
+                bookId: String(match.book_id || bookId),
+                name: match.series_name || `ID:${bookId}`,
+                totalEpisodes: match.episode_amount || 0,
+                publishStatus: av.publish_status ?? 0,
+                deliveryStatus: av.delivery_status ?? false,
+                permissionStatus: match.permission_status ?? 0,
+                awemeUserId: av.playlet_id || '',
+                publishName: av.publish_aweme_user?.nick_name || '',
+                douyinId: av.publish_aweme_user?.douyin_id || '',
+                gender: match.gender || 0,
+                categoryText: match.category_text || '',
+                cover: match.thumb_url || ''
+            };
+        } catch(e) {
+            console.error(`[漫剧IAP ID搜索:${bookId}] 异常:`, e.message);
+            return { error: e.message };
+        }
+    }
+
+    async function searchDrama(name) {
+        try {
+            let data = await searchDramaRaw(name);
+            console.log(`[漫剧IAP搜索:${name}] code=${data.code}, msg=${data.message || ''}`);
+
+            if (data.code !== 0) {
+                return { error: data.message || `搜索失败(code=${data.code})` };
+            }
+
+            let list = data.data?.data || data.data?.list || data.data?.series_list || [];
+
+            if ((!list || list.length === 0) && name.length > 2) {
+                const cleanName = name.replace(/[，,。.！!？?：:、；;""''《》【】()（）\s]/g, '');
+                if (cleanName !== name && cleanName.length > 1) {
+                    console.log(`[漫剧IAP搜索:${name}] 精确搜索无结果，尝试去标点: ${cleanName}`);
+                    data = await searchDramaRaw(cleanName);
+                    if (data.code === 0) {
+                        list = data.data?.data || data.data?.list || data.data?.series_list || [];
+                    }
+                }
+            }
+
+            if ((!list || list.length === 0) && name.includes('，')) {
+                const parts = name.split('，');
+                for (const part of parts) {
+                    if (part.trim().length > 1) {
+                        console.log(`[漫剧IAP搜索:${name}] 尝试分段搜索: ${part.trim()}`);
+                        data = await searchDramaRaw(part.trim());
+                        if (data.code === 0) {
+                            list = data.data?.data || data.data?.list || data.data?.series_list || [];
+                            if (list && list.length > 0) break;
+                        }
+                    }
+                }
+            }
+
+            if (!list || list.length === 0) {
+                return { error: '不存在' };
+            }
+
+            // 【v2.0】解析所有搜索结果
+            const allResults = list.map(item => {
+                const av = item.aweme_version_book_data || {};
+                return {
+                    bookId: String(item.book_id || ''),
+                    name: item.series_name || name,
+                    totalEpisodes: item.episode_amount || 0,
+                    publishStatus: av.publish_status ?? 0,
+                    deliveryStatus: av.delivery_status ?? false,
+                    permissionStatus: item.permission_status ?? 0,
+                    awemeUserId: av.playlet_id || '',
+                    publishName: av.publish_aweme_user?.nick_name || '',
+                    douyinId: av.publish_aweme_user?.douyin_id || '',
+                    gender: item.gender || 0,
+                    categoryText: item.category_text || '',
+                    cover: item.thumb_url || ''
+                };
+            });
+
+            // 【v2.2】统一标点后匹配：全角转半角再去标点，解决":""："等差异
+            // "剑修变系统:这届女主我罩了"应匹配"剑修变系统：这届女主我罩了"
+            // "弃子登科，六元及第"不应匹配"我爹是状元：六元及第震惊全城"
+            const normPunc = (s) => String(s).trim()
+                .replace(/：/g, ':').replace(/，/g, ',').replace(/；/g, ';').replace(/！/g, '!').replace(/？/g, '?')
+                .replace(/（/g, '(').replace(/）/g, ')').replace(/【/g, '[').replace(/】/g, ']')
+                .replace(/[""]/g, '"').replace(/['']/g, "'")
+                .replace(/[\s,。.!！?？:：、；;""''《》【】()（）\-\/]/g, '');
+
+            const searchNorm = normPunc(name);
+
+            // 1. 精确匹配（统一标点后完全相等）
+            const exactMatches = allResults.filter(r => normPunc(r.name) === searchNorm);
+            if (exactMatches.length === 1) {
+                const match = exactMatches[0];
+                console.log(`[漫剧IAP搜索:${name}] 精确匹配:`, match.name, 'book_id:', match.bookId);
+                return match;
+            }
+            if (exactMatches.length > 1) {
+                console.log(`[漫剧IAP搜索:${name}] 发现${exactMatches.length}个精确匹配，等待用户选择`);
+                return { multiple: true, results: exactMatches, searchName: name };
+            }
+
+            // 2. 无精确匹配，检查第一个结果是否相关（统一标点后互相包含）
+            const firstNorm = normPunc(allResults[0].name);
+            if (firstNorm.includes(searchNorm) || searchNorm.includes(firstNorm)) {
+                console.log(`[漫剧IAP搜索:${name}] 模糊匹配:`, allResults[0].name, 'book_id:', allResults[0].bookId);
+                return allResults[0];
+            }
+
+            console.log(`[漫剧IAP搜索:${name}] 搜索结果不匹配，API返回${allResults.length}条但无匹配项:`, allResults.map(r => r.name).join(', '));
+            return { error: '不存在' };
+        } catch(e) {
+            console.error(`[漫剧IAP搜索:${name}] 异常:`, e.message);
+            return { error: e.message };
+        }
+    }
+
+    // ==================== 文本归一化 ====================
+    function normalizeText(str) {
+        return String(str || '')
+            .replace(/\s+/g, '')
+            .replace(/（/g, '(')
+            .replace(/）/g, ')')
+            .trim();
+    }
+
+    // ==================== IAP模板优先级常量 ====================
+    // IAP模板按金额档位优先级：超小额 > 超超小额 > 小额 > 中额
+    // 不按集数区间过滤，统一按金额档位选择最优模板
+    const TEMPLATE_PRIORITY = ['超小额', '超超小额', '小额', '中额'];
+
+    // ==================== 模板API（兼容IAP的pay_panel和IAA的ad_panel双字段） ====================
+    async function getTemplates(bookId) {
+        const data = await apiGet('/template/get_aweme_native_purchase_panel/v1/', { book_id: bookId });
+        if (data.code !== 0) return [];
+        // IAP返回 pay_panel_details.panel_list, IAA返回 ad_panel_details.panel_list
+        // 兼容两种字段结构
+        const panelData = data.data?.pay_panel_details || data.data?.ad_panel_details || {};
+        const list = panelData.panel_list || [];
+        return list.map(p => ({
+            templateId: String(p.panel_template_id || p.template_id || ''),
+            templateName: p.panel_name || p.name || '',
+            startEpisode: p.start_episode || 0,
+            canCreate: p.can_create_promotion ?? p.can_create ?? false
+        }));
+    }
+
+    // ==================== IAP模板选择：按金额档位优先级（不考虑集数区间） ====================
+    // 从API返回的模板列表中按金额优先级选择最优模板
+    // 优先级：超小额 > 超超小额 > 小额 > 中额
+    // 跳过已排除的档位（之前失败过的）
+    function selectBestTemplate(templates, totalEpisodes, excludeBases = []) {
+        const matched = [];
+        for (const t of templates) {
+            const text = normalizeText(t.templateName || '');
+            if (!text) continue;
+
+            for (const base of TEMPLATE_PRIORITY) {
+                const baseNorm = normalizeText(base);
+                if (text.includes(baseNorm)) {
+                    // 跳过已排除的档位
+                    if (excludeBases.some(eb => normalizeText(base).includes(eb) || normalizeText(eb).includes(baseNorm))) break;
+                    const priority = TEMPLATE_PRIORITY.indexOf(base);
+                    matched.push({ template: t, base, priority, text });
+                    break;
+                }
+            }
+        }
+
+        if (matched.length > 0) {
+            matched.sort((a, b) => a.priority - b.priority);
+            return matched[0];
+        }
+
+        // 没有匹配到任何档位的模板 → 返回null
+        return null;
+    }
+
+    // ==================== IAP推广链排序：按金额档位优先级 ====================
+    // 优先级：超小额 > 超超小额 > 小额 > 中额
+    function sortPromoLinksByPriority(links, totalEpisodes) {
+        if (!links || links.length <= 1) return links || [];
+
+        return [...links].sort((a, b) => {
+            const aName = normalizeText(a.panelName || '');
+            const bName = normalizeText(b.panelName || '');
+
+            // 按金额档位优先级排序
+            let aPriority = 99, bPriority = 99;
+            for (let i = 0; i < TEMPLATE_PRIORITY.length; i++) {
+                if (aName.includes(normalizeText(TEMPLATE_PRIORITY[i]))) aPriority = i;
+                if (bName.includes(normalizeText(TEMPLATE_PRIORITY[i]))) bPriority = i;
+            }
+            return aPriority - bPriority;
+        });
+    }
+
+    // ==================== 创建推广链API（兼容IAP和IAA双字段，含重试） ====================
+    async function createPromoLink(bookId, templateId, promoName, retryCount = 0) {
+        try {
+            const data = await apiPost('/promotion/aweme_native/create/v2/', {
+                book_id: String(bookId),
+                promotion_name: promoName,
+                purchase_panel_template_id: String(templateId)
+            });
+            // 4009频率限制 → 自动重试
+            if (data.code === 4009 && retryCount < 3) {
+                const waitMs = 1000 * (retryCount + 1);
+                console.log(`[创建推广链:${bookId}] 频率限制(4009)，${waitMs/1000}s后重试(${retryCount + 1}/3)`);
+                await sleep(waitMs);
+                return createPromoLink(bookId, templateId, promoName, retryCount + 1);
+            }
+            // 网络偶发错误 → 自动重试
+            if (data.code !== 0 && data.code !== 4009 && retryCount < 2) {
+                console.log(`[创建推广链:${bookId}] 创建失败(code=${data.code})，1.5s后重试(${retryCount + 1}/2): ${data.message || ''}`);
+                await sleep(1000);
+                return createPromoLink(bookId, templateId, promoName, retryCount + 1);
+            }
+            if (data.code !== 0) return { error: data.message || `创建失败(code=${data.code})` };
+            // IAP: data.promotion_info, IAA: data.data.promotion_info — 兼容两种
+            const d = data.data || data;
+            const info = d.promotion_info || {};
+            // IAP可能返回 purchase_panel_data.pay_panel_details.panel_list[0].panel_name
+            const panelData = d.purchase_panel_data?.pay_panel_details || d.purchase_panel_data?.ad_panel_details || {};
+            const panelName = panelData.panel_list?.[0]?.panel_name || '';
+            return {
+                promoId: info.promotion_id || '',
+                promoName: info.promotion_name || promoName,
+                link: info.promotion_url || '',
+                templateId: templateId,
+                panelName: panelName
+            };
+        } catch(e) {
+            if (retryCount < 2) {
+                console.log(`[创建推广链:${bookId}] 网络异常，1.5s后重试(${retryCount + 1}/2): ${e.message}`);
+                await sleep(1000);
+                return createPromoLink(bookId, templateId, promoName, retryCount + 1);
+            }
+            return { error: e.message || '网络异常' };
+        }
+    }
+
+    // ==================== 推广链列表API（兼容IAP的pay_panel_info和IAA的ad_panel_info，含重试） ====================
+    // 【v2.3修复】参照老版本v15.4：移除book_id匹配filter（大数精度丢失导致过滤掉所有数据）
+    // API请求中已传book_id参数，返回的数据就是该剧的推广链，无需二次filter
+    // 【v2.3关键修复】日期跨度不能超过180天，否则API返回4009"推广链时间跨度不能超过180天"
+    async function getPromoLinks(bookId, retryCount = 0) {
+        const now = new Date();
+        const end = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        // 日期跨度设为180天（API限制不能超过180天）
+        const beginDate = new Date(now.getTime() - 180 * 24 * 60 * 60 * 1000);
+        const begin = `${beginDate.getFullYear()}-${String(beginDate.getMonth()+1).padStart(2,'0')}-${String(beginDate.getDate()).padStart(2,'0')}`;
+
+        try {
+            const data = await apiGet('/promotion/list/v1/', {
+                aweme_user_new_version: 'true',
+                book_id: String(bookId || ''),
+                begin_date: begin,
+                end_date: end,
+                page_index: 0,
+                page_size: 200
+            });
+            // 4009频率限制：重试
+            if (data.code === 4009 && retryCount < 3) {
+                const waitMs = 1000 * (retryCount + 1);
+                console.log(`[漫剧IAP推广链查询:${bookId}] 频率限制(4009)，${waitMs/1000}s后重试(${retryCount + 1}/3)`);
+                await sleep(waitMs);
+                return getPromoLinks(bookId, retryCount + 1);
+            }
+            // 其他错误码（如4001未登录）：不重试，直接返回空数组，避免拖慢速度
+            if (data.code !== 0) {
+                console.log(`[漫剧IAP推广链查询:${bookId}] API错误 code=${data.code} msg=${data.message || ''}，跳过不重试`);
+                return [];
+            }
+            const list = Array.isArray(data.data) ? data.data : [];
+            console.log(`[漫剧IAP推广链查询:${bookId}] API返回${list.length}条推广链`);
+            if (list.length > 0) {
+                console.log(`[漫剧IAP推广链查询:${bookId}] 第一条数据结构:`, JSON.stringify(list[0]).substring(0, 500));
+            }
+            // 【v2.3关键修复】移除book_id filter！
+            // 原因：book_id是大数字（如7380942001821516808），超过JS Number.MAX_SAFE_INTEGER
+            // JSON.parse解析数字类型的book_id会丢失精度，导致String(bid) !== String(bookId)
+            // API请求中已传book_id参数，返回的数据就是该剧的推广链，无需二次filter
+            // 参照老版本v15.4的handlePromoList函数，直接使用返回数据
+            return list.map(p => {
+                // 字段提取与老版本handlePromoList保持一致
+                // IAP: pay_panel_info优先, IAA: ad_panel_info备选
+                const promoUrl = p.aweme_info?.aweme_promotion_url || '';
+                if (!promoUrl) return null; // 跳过没有URL的项
+                const panelName = p.pay_panel_info?.panel_name || p.ad_panel_info?.panel_name || '';
+                const startEpisode = p.pay_panel_info?.start_episode || p.ad_panel_info?.start_episode || 0;
+                const label = panelName || (startEpisode > 0 ? `第${startEpisode}集起广` : 'IAP');
+                return {
+                    promoId: p.promotion_info?.promotion_id || '',
+                    promoName: p.promotion_info?.promotion_name || label,
+                    link: promoUrl,
+                    startEpisode: startEpisode,
+                    templateId: p.pay_panel_info?.panel_id || p.ad_panel_info?.panel_id || '',
+                    panelName: label,
+                    createTime: p.promotion_info?.create_time || '',
+                    awemeName: p.aweme_info?.aweme_work_name || ''
+                };
+            }).filter(p => p !== null); // 只过滤掉没有URL的项
+        } catch(e) {
+            console.log(`[漫剧IAP推广链查询:${bookId}] 网络异常: ${e.message}`);
+            // 网络异常只重试1次，避免拖慢速度
+            if (retryCount < 1) {
+                await sleep(1000);
+                return getPromoLinks(bookId, retryCount + 1);
+            }
+            return [];
+        }
+    }
+
+    // ==================== 状态文本转换 ====================
+    function publishStatusText(status) {
+        const map = { 1: '未发布', 2: '已发布', 3: '已下架', 0: '未知' };
+        return map[status] ?? '未知';
+    }
+    function publishStatusBadge(status) {
+        const text = publishStatusText(status);
+        if (status === 2) return `<span class="cd-badge cd-badge-ok">${text}</span>`;
+        if (status === 1) return `<span class="cd-badge cd-badge-warn">${text}</span>`;
+        if (status === 3) return `<span class="cd-badge cd-badge-err">${text}</span>`;
+        return `<span class="cd-badge cd-badge-info">${text}</span>`;
+    }
+    function authStatusText(perm) {
+        const map = { 2: '无授权', 4: '普通授权' };
+        return map[perm] ?? '未知';
+    }
+    function authStatusBadge(perm) {
+        const text = authStatusText(perm);
+        if (perm === 4) return `<span class="cd-badge cd-badge-ok">${text}</span>`;
+        if (perm === 2) return `<span class="cd-badge cd-badge-err">${text}</span>`;
+        return `<span class="cd-badge cd-badge-info">${text}</span>`;
+    }
+    function deliveryStatusText(status) {
+        if (status === true) return '可投放';
+        if (status === false) return '不可投放';
+        return '未知';
+    }
+    function deliveryStatusBadge(status) {
+        const text = deliveryStatusText(status);
+        if (status === true) return `<span class="cd-badge cd-badge-ok">${text}</span>`;
+        if (status === false) return `<span class="cd-badge cd-badge-err">${text}</span>`;
+        return `<span class="cd-badge cd-badge-info">${text}</span>`;
+    }
+
+    // ==================== 渲染表格（虚拟滚动） ====================
+    function renderTable() {
+        const dramas = Object.values(dramaMap);
+        if (dramas.length === 0) {
+            emptyEl.style.display = '';
+            tableWrap.style.display = 'none';
+            footerInfo.textContent = '共 0 部漫剧';
+            exportBtn.disabled = true;
+            clearAllBtn.disabled = true;
+            virtualState.startIndex = 0;
+            virtualState.endIndex = 0;
+            return;
+        }
+        emptyEl.style.display = 'none';
+        tableWrap.style.display = '';
+        exportBtn.disabled = false;
+        clearAllBtn.disabled = false;
+
+        thead.innerHTML = `<tr>
+            <th style="width:3%">#</th>
+            <th style="width:12%">漫剧名称</th>
+            <th style="width:9%">漫剧ID</th>
+            <th style="width:9%">抖音作品ID</th>
+            <th style="width:4%">总集数</th>
+            <th style="width:5%">发布状态</th>
+            <th style="width:5%">投放状态</th>
+            <th style="width:5%">授权状态</th>
+            <th style="width:31%">IAP推广链接</th>
+            <th style="width:7%">操作</th>
+        </tr>`;
+
+        const { rowHeight, bufferRows } = VIRTUAL_CONFIG;
+        const scrollTop = tableWrap.scrollTop || 0;
+        const viewportHeight = tableWrap.clientHeight || 0;
+        const total = dramas.length;
+        const startIdx = Math.max(0, Math.floor(scrollTop / rowHeight) - bufferRows);
+        const endIdx = Math.min(total, Math.ceil((scrollTop + viewportHeight) / rowHeight) + bufferRows);
+
+        virtualState.startIndex = startIdx;
+        virtualState.endIndex = endIdx;
+
+        const topSpacer = startIdx > 0
+            ? `<tr class="cd-virtual-spacer" style="height:${startIdx * rowHeight}px"><td colspan="10"></td></tr>`
+            : '';
+        const bottomSpacer = endIdx < total
+            ? `<tr class="cd-virtual-spacer" style="height:${(total - endIdx) * rowHeight}px"><td colspan="10"></td></tr>`
+            : '';
+
+        let visibleRows = '';
+        for (let i = startIdx; i < endIdx; i++) {
+            const d = dramas[i];
+            // 计算该剧的集数区间
+            const epN = Number(d.totalEpisodes) || 0;
+            let epRange = '';
+            if (epN > 60) epRange = '60集以上';
+            else if (epN >= 30 && epN <= 60) epRange = '30-60集';
+            else if (epN > 0 && epN < 30) epRange = '30集以下';
+            const epRangeNorm = normalizeText(epRange);
+
+            const links = (d.promoLinks || []).map(p => {
+                const epLabel = p.panelName ? p.panelName : (p.startEpisode ? `${p.startEpisode}集起广` : '推广链');
+                const linkText = p.link ? (p.link.length > 60 ? p.link.substring(0, 60) + '...' : p.link) : (p.promoName || p.promoId || '链接');
+                // 判断链接是否匹配集数区间
+                const nameNorm = normalizeText(p.panelName || '');
+                const isMismatch = epRangeNorm && nameNorm && !nameNorm.includes(epRangeNorm);
+                const mismatchClass = isMismatch ? ' cd-link-mismatch' : '';
+                const mismatchTitle = isMismatch ? ' [区间不匹配]' : '';
+                return `<div class="cd-iap-link${mismatchClass}" title="${p.link || ''}${mismatchTitle}"><span class="lk-label">${epLabel}</span>${p.link ? `<a href="${p.link}" target="_blank">${linkText}</a>` : linkText}</div>`;
+            }).join('') || (d.error ? `<span class="cd-error-text">${d.error}</span>` : '<span style="color:#d0c8d8">无</span>');
+
+            const canCreate = d.publishStatus === 2 && d.permissionStatus === 4 && d.deliveryStatus === true;
+            const hasLinks = d.promoLinks && d.promoLinks.length > 0;
+            let actionBtn;
+            if (d.bookId === '-' || (d.bookId || '').startsWith('err_')) {
+                actionBtn = `<span class="cd-btn-disabled-inline" title="${d.error || '不存在'}">${d.error || '不存在'}</span>`;
+            } else if (hasLinks) {
+                // 【v2.0】已有链接 → 统一显示"已有链接"，不再因区间不匹配而显示"取链接"
+                actionBtn = `<span class="cd-btn-disabled-inline" title="已有推广链">已有链接</span>`;
+            } else if (canCreate) {
+                actionBtn = `<button class="cd-btn cd-btn-primary" style="height:28px;padding:0 12px;font-size:11px" onclick="window.__cdMjIapCreateLink('${d.bookId}')">取链接</button>`;
+            } else {
+                let reason = [];
+                if (d.publishStatus === 3) reason.push('已下架');
+                else if (d.publishStatus === 1) reason.push('未发布');
+                else if (d.publishStatus !== 2) reason.push('状态未知');
+                if (d.deliveryStatus === false && d.publishStatus === 2) reason.push('不可投放');
+                if (d.permissionStatus === 2) reason.push('无授权');
+                else if (d.permissionStatus !== 4 && d.publishStatus === 2) reason.push('无授权');
+                const reasonText = reason.length > 0 ? reason.join('+') : '不可创建';
+                actionBtn = `<span class="cd-btn-disabled-inline" title="${reasonText}，按钮灰色">${reasonText}</span>`;
+            }
+
+            visibleRows += `<tr>
+                <td>${i + 1}</td>
+                <td title="${d.name}">${d.name || '-'}</td>
+                <td style="font-family:monospace;font-size:11px">${d.bookId || '-'}</td>
+                <td style="font-family:monospace;font-size:11px">${d.awemeUserId || '-'}</td>
+                <td>${d.totalEpisodes || '-'}</td>
+                <td>${publishStatusBadge(d.publishStatus)}</td>
+                <td>${deliveryStatusBadge(d.deliveryStatus)}</td>
+                <td>${authStatusBadge(d.permissionStatus)}</td>
+                <td>${links}</td>
+                <td>${actionBtn}</td>
+            </tr>`;
+        }
+
+        tbody.innerHTML = topSpacer + visibleRows + bottomSpacer;
+        footerInfo.textContent = `共 ${total} 部漫剧（虚拟滚动，显示 ${startIdx + 1}-${endIdx}）`;
+    }
+
+    function onVirtualScroll() {
+        if (virtualState._rafId) return;
+        virtualState._rafId = requestAnimationFrame(() => {
+            virtualState._rafId = null;
+            const dramas = Object.values(dramaMap);
+            if (dramas.length === 0) return;
+            const { rowHeight, bufferRows } = VIRTUAL_CONFIG;
+            const scrollTop = tableWrap.scrollTop;
+            const viewportHeight = tableWrap.clientHeight;
+            const total = dramas.length;
+            const startIdx = Math.max(0, Math.floor(scrollTop / rowHeight) - bufferRows);
+            const endIdx = Math.min(total, Math.ceil((scrollTop + viewportHeight) / rowHeight) + bufferRows);
+            if (startIdx !== virtualState.startIndex || endIdx !== virtualState.endIndex) {
+                renderTable();
+            }
+        });
+    }
+    function initVirtualScroll() {
+        tableWrap.addEventListener('scroll', onVirtualScroll, { passive: true });
+    }
+
+    // ==================== 自动创建推广链 ====================
+    async function autoCreatePromoLink(bookId) {
+        const drama = dramaMap[bookId];
+        if (!drama) return;
+
+        if (drama.promoLinks && drama.promoLinks.length > 0) {
+            log(`${drama.name} 已有 ${drama.promoLinks.length} 条推广链，跳过创建`, 'ok');
+            return;
+        }
+
+        if (drama.publishStatus !== 2) {
+            log(`${drama.name} - ${publishStatusText(drama.publishStatus)}，无法创建推广链`, 'er');
+            return;
+        }
+        if (drama.deliveryStatus !== true) {
+            log(`${drama.name} - ${deliveryStatusText(drama.deliveryStatus)}，无法创建推广链`, 'er');
+            return;
+        }
+        if (drama.permissionStatus !== 4) {
+            log(`${drama.name} - ${authStatusText(drama.permissionStatus)}，无法创建推广链`, 'er');
+            return;
+        }
+
+        log(`正在获取 ${drama.name} 的可用模板...`, 'inf');
+        const templates = await getTemplates(bookId);
+        if (templates.length === 0) {
+            log(`${drama.name} - 无可用模板`, 'er');
+            drama.error = '无可用模板';
+            return;
+        }
+
+        let available = templates.filter(t => t.canCreate);
+        if (available.length === 0) {
+            log(`${drama.name} - 所有模板链接已被取完`, 'er');
+            drama.error = '链接已被取完';
+            return;
+        }
+
+        const now = new Date();
+        const promoName = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+
+        // 【v2.1】IAP模板选择：selectBestTemplate已内置区间匹配，无需前置冗余检查
+        const excludeBases = [];
+        for (let attempt = 0; attempt < 5; attempt++) {
+            const templateResult = selectBestTemplate(available, drama.totalEpisodes, excludeBases);
+            if (!templateResult) {
+                // 匹配区间内无可用模板 → 直接返回，不创建错误区间链接
+                if (!drama.error) drama.error = '无可用模板';
+                return;
+            }
+
+            const preferred = templateResult.template;
+            log(`${drama.name} - 尝试模板: ${preferred.templateName}`, 'inf');
+
+            const result = await createPromoLink(bookId, preferred.templateId, promoName);
+            if (!result.error) {
+                drama.promoLinks = [{
+                    promoId: result.promoId,
+                    promoName: result.promoName,
+                    link: result.link,
+                    startEpisode: preferred.startEpisode,
+                    templateId: preferred.templateId,
+                    panelName: result.panelName || preferred.templateName,
+                    createTime: now.toISOString()
+                }];
+                log(`${drama.name} - 创建成功（${preferred.templateName}）`, 'ok');
+                renderTable();
+                return;
+            }
+
+            // 创建失败，排除当前base继续降级
+            if (!excludeBases.includes(templateResult.base)) {
+                excludeBases.push(templateResult.base);
+            }
+        }
+
+        drama.error = '所有模板均创建失败';
+        log(`${drama.name} - 所有模板均创建失败`, 'er');
+    }
+
+    // ==================== 【v2.0】重名剧目选择弹窗 ====================
+    function showMultiSelectModal(multiResults) {
+        return new Promise((resolve) => {
+            const overlay = document.createElement('div');
+            overlay.className = 'cd-batch-overlay';
+            let html = `<div class="cd-batch-modal" style="width:620px;max-height:80vh;overflow-y:auto">
+                <div class="cd-batch-header">
+                    <h4>发现 ${multiResults.length} 部重名漫剧，请选择</h4>
+                    <button class="cd-batch-close">✕</button>
+                </div>
+                <div class="cd-batch-hint">
+                    以下漫剧存在<b>重名</b>，请选择您需要的版本。每部漫剧选择一个后点击确认。
+                </div>
+                <div style="padding:0 20px 8px">`;
+            multiResults.forEach((mr, idx) => {
+                html += `<div style="margin-bottom:14px">
+                    <div style="font-weight:600;margin-bottom:6px;color:#5a4a6a;font-size:13px">${idx + 1}. ${mr.searchName}</div>`;
+                mr.results.forEach((drama, di) => {
+                    const pubText = publishStatusText(drama.publishStatus);
+                    const delivText = deliveryStatusText(drama.deliveryStatus);
+                    const authText = authStatusText(drama.permissionStatus);
+                    const checked = di === 0 ? 'checked' : '';
+                    html += `<label style="display:flex;align-items:flex-start;gap:8px;padding:8px 12px;border:1px solid #e0d0e8;border-radius:8px;margin-bottom:4px;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor='#7e57c2'" onmouseout="this.style.borderColor='#e0d0e8'">
+                        <input type="radio" name="multi_${idx}" value="${di}" ${checked} style="margin-top:3px" />
+                        <div style="flex:1">
+                            <div style="font-size:13px;color:#5a4a6a">${drama.name} <span style="color:#a890b8;font-size:11px">(ID: ${drama.bookId})</span></div>
+                            <div style="font-size:11px;color:#a890b8;margin-top:2px">总集数: ${drama.totalEpisodes} | ${pubText} | ${delivText} | ${authText}${drama.awemeUserId ? ' | 抖音ID: ' + drama.awemeUserId : ''}</div>
+                        </div>
+                    </label>`;
+                });
+                html += `</div>`;
+            });
+            html += `</div>
+                <div class="cd-batch-footer">
+                    <button class="cd-btn cd-btn-secondary" id="cd-multi-cancel">取消(默认选第一个)</button>
+                    <button class="cd-btn cd-btn-primary" id="cd-multi-confirm">确认选择</button>
+                </div>
+            </div>`;
+            overlay.innerHTML = html;
+            document.body.appendChild(overlay);
+            function getSelected() {
+                const selected = [];
+                multiResults.forEach((mr, idx) => {
+                    const checked = overlay.querySelector(`input[name="multi_${idx}"]:checked`);
+                    selected.push(checked ? mr.results[parseInt(checked.value)] : mr.results[0]);
+                });
+                return selected;
+            }
+            function close() { overlay.classList.add('closing'); setTimeout(() => overlay.remove(), 150); }
+            document.getElementById('cd-multi-confirm').onclick = () => { const s = getSelected(); close(); resolve(s); };
+            document.getElementById('cd-multi-cancel').onclick = () => { const s = getSelected(); close(); resolve(s); };
+            overlay.querySelector('.cd-batch-close').onclick = () => { const s = getSelected(); close(); resolve(s); };
+            overlay.onclick = (e) => { if (e.target === overlay) { const s = getSelected(); close(); resolve(s); } };
+        });
+    }
+
+    // ==================== 主流程：极速批量获取 ====================
+    async function turboSearch(items) {
+        if (items.length === 0) return;
+        isWorking = true;
+        stopRequested = false;
+        stopBtn.style.display = '';
+        progressEl.style.display = '';
+        progressFill.style.width = '0%';
+
+        // 清除上一次搜索的错误条目
+        for (const key of Object.keys(dramaMap)) {
+            if (key.startsWith('err_')) delete dramaMap[key];
+        }
+
+        let waitCount = 0;
+        while (!authInfo.appid && waitCount < 30) {
+            log(`正在获取认证信息... (appid:${authInfo.appid ? '✓' : '✗'})`, 'inf');
+            await sleep(500);
+            waitCount++;
+        }
+        if (!authInfo.appid) {
+            log('未能获取认证信息(appid)，请先在页面左侧漫剧列表中搜索一次任意剧名', 'er');
+            finishWork();
+            return;
+        }
+        log(`认证就绪: appid=${authInfo.appid}, distributor=${authInfo.distributorId}`, 'ok');
+
+        // 第1步：批量并发搜索
+        const modeLabel = searchMode === 'id' ? 'ID' : '名称';
+        log(`[1/4] 批量并发搜索 ${items.length} 部漫剧（${modeLabel}模式，5并发）...`, 'inf');
+        const searchResults = await batchConcurrent(items, 5, async (item, idx) => {
+            await sleep(idx % 5 * 50);
+            try {
+                return searchMode === 'id' ? await searchDramaById(item) : await searchDrama(item);
+            } catch(e) {
+                return { error: e.message, name: item };
+            }
+        });
+
+        // 处理搜索结果：区分单结果、多结果(重名)和错误
+        const multiResults = [];
+        for (let i = 0; i < items.length; i++) {
+            const r = searchResults[i];
+            if (r && r.multiple) {
+                multiResults.push(r);
+            } else if (r && !r.error && r.bookId) {
+                dramaMap[r.bookId] = {
+                    ...dramaMap[r.bookId],
+                    ...r,
+                    searchName: items[i],
+                    promoLinks: dramaMap[r.bookId]?.promoLinks || []
+                };
+            } else {
+                const tempId = 'err_' + i;
+                const errMsg = r?.error || '搜索失败';
+                console.log(`[漫剧IAP搜索结果] 第${i+1}部「${items[i]}」失败: ${errMsg}`);
+                dramaMap[tempId] = {
+                    bookId: '-',
+                    name: items[i],
+                    publishStatus: 0,
+                    deliveryStatus: false,
+                    permissionStatus: 0,
+                    error: errMsg,
+                    promoLinks: []
+                };
+            }
+        }
+        renderTable();
+
+        if (multiResults.length > 0) {
+            log(`[1/4] 发现 ${multiResults.length} 部重名漫剧，请选择...`, 'inf');
+            const selectedDramas = await showMultiSelectModal(multiResults);
+            for (const drama of selectedDramas) {
+                if (drama && drama.bookId) {
+                    dramaMap[drama.bookId] = {
+                        ...dramaMap[drama.bookId],
+                        ...drama,
+                        promoLinks: dramaMap[drama.bookId]?.promoLinks || []
+                    };
+                }
+            }
+            renderTable();
+            log(`[1/4] 重名选择完成`, 'ok');
+        }
+
+        const found = Object.values(dramaMap).filter(d => d.bookId && !d.bookId.startsWith('err_')).length;
+        log(`[1/4] 搜索完成：${found}/${items.length} 部找到`, 'ok');
+
+        if (stopRequested) { finishWork(); return; }
+
+        // 第2步：为已发布+可投放+有授权的剧自动创建推广链
+        const needCreate = Object.values(dramaMap).filter(d =>
+            d.bookId && !d.bookId.startsWith('err_') &&
+            d.publishStatus === 2 && d.deliveryStatus !== false && d.permissionStatus === 4
+        );
+
+        if (needCreate.length > 0) {
+            log(`[2/4] 为 ${needCreate.length} 部漫剧自动创建推广链（4并发）...`, 'inf');
+            let createdCount = 0;
+            await batchConcurrent(needCreate, 4, async (drama, idx) => {
+                if (stopRequested) return;
+                await sleep(idx % 4 * 50);
+                try {
+                    await autoCreatePromoLink(drama.bookId);
+                    if (drama.promoLinks && drama.promoLinks.length > 0) createdCount++;
+                } catch(e) {
+                    console.error(`[漫剧IAP创建链接:${drama.name}] 异常:`, e.message);
+                }
+            });
+
+            // 对创建失败的剧重试一次
+            const failedDramas = needCreate.filter(d => !d.promoLinks || d.promoLinks.length === 0);
+            if (failedDramas.length > 0 && !stopRequested) {
+                log(`[2/4] ${failedDramas.length} 部创建失败，2s后重试一次...`, 'inf');
+                await sleep(2000);
+                let retryCount = 0;
+                await batchConcurrent(failedDramas, 4, async (drama, idx) => {
+                    if (stopRequested) return;
+                    await sleep(idx % 4 * 50);
+                    try {
+                        await autoCreatePromoLink(drama.bookId);
+                        if (drama.promoLinks && drama.promoLinks.length > 0) retryCount++;
+                    } catch(e) {
+                        console.error(`[漫剧IAP重试创建:${drama.name}] 异常:`, e.message);
+                    }
+                });
+                createdCount += retryCount;
+            }
+
+            renderTable();
+            log(`[2/4] 推广链创建完成：${createdCount}/${needCreate.length} 部成功`, 'ok');
+        }
+
+        if (stopRequested) { finishWork(); return; }
+
+        // 第3步：为创建失败的剧查询已有推广链（180天范围）
+        const needQuery = needCreate.filter(d =>
+            !d.promoLinks || d.promoLinks.length === 0
+        );
+
+        if (needQuery.length > 0) {
+            log(`[3/4] 为 ${needQuery.length} 部漫剧查询已有推广链（180天范围）...`, 'inf');
+            await batchConcurrent(needQuery, 5, async (drama, idx) => {
+                if (stopRequested) return;
+                await sleep(idx % 5 * 50);
+                try {
+                    const existingLinks = await getPromoLinks(drama.bookId);
+                    if (existingLinks && existingLinks.length > 0) {
+                        drama.promoLinks = sortPromoLinksByPriority(existingLinks, drama.totalEpisodes);
+                    }
+                } catch(e) {
+                    console.error(`[漫剧IAP查询链接:${drama.name}] 异常:`, e.message);
+                }
+            });
+            renderTable();
+            const linkedCount = Object.values(dramaMap).filter(d => d.promoLinks && d.promoLinks.length > 0).length;
+            log(`[3/4] 推广链查询完成：${linkedCount} 部已有链接`, 'ok');
+        }
+
+        if (stopRequested) { finishWork(); return; }
+
+        // 第4步：补漏验证 - 为仍无链接的可创建剧目做最后尝试
+        const stillMissing = needCreate.filter(d =>
+            (!d.promoLinks || d.promoLinks.length === 0) && !d.error
+        );
+        if (stillMissing.length > 0) {
+            log(`[4/4] 补漏验证：${stillMissing.length} 部仍无链接，最后尝试查询...`, 'inf');
+            await sleep(2000);
+            await batchConcurrent(stillMissing, 3, async (drama) => {
+                if (stopRequested) return;
+                try {
+                    const existingLinks = await getPromoLinks(drama.bookId);
+                    if (existingLinks && existingLinks.length > 0) {
+                        drama.promoLinks = sortPromoLinksByPriority(existingLinks, drama.totalEpisodes);
+                        drama.error = null;
+                    } else if (!drama.error) {
+                        drama.error = '创建失败且无已有链接';
+                    }
+                } catch(e) {
+                    console.error(`[漫剧IAP补漏查询:${drama.name}] 异常:`, e.message);
+                }
+            });
+            renderTable();
+        }
+
+        finishWork();
+    }
+
+    function finishWork() {
+        isWorking = false;
+        stopBtn.style.display = 'none';
+        progressEl.style.display = 'none';
+        const total = Object.keys(dramaMap).length;
+        const linked = Object.values(dramaMap).filter(d => d.promoLinks && d.promoLinks.length > 0).length;
+        log(`全部完成！共获取 ${total} 部漫剧数据，${linked} 部有推广链`, 'ok');
+    }
+
+    // ==================== 手动取链接 ====================
+    unsafeWindow.__cdMjIapCreateLink = async function(bookId) {
+        if (isWorking) {
+            log('正在执行批量任务，请等待完成', 'er');
+            return;
+        }
+        log(`正在为 ${dramaMap[bookId]?.name || bookId} 创建推广链...`, 'inf');
+        await autoCreatePromoLink(bookId);
+        renderTable();
+    };
+
+    // ==================== Excel导出（含投放状态） ====================
+    function exportExcel() {
+        const dramas = Object.values(dramaMap);
+        if (dramas.length === 0) return;
+
+        dramas.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh'));
+
+        const sheetData = dramas.map((d, i) => {
+            const links = d.promoLinks || [];
+            const mainLink = links[0] || null;
+            // 发布状态
+            let pubStatusText = '正常';
+            if (d.publishStatus === 3) pubStatusText = '已下架';
+            else if (d.publishStatus === 1) pubStatusText = '未发布';
+            else if (d.publishStatus === 0 && d.error) pubStatusText = d.error;
+            // 投放状态
+            let delivStatusText = '-';
+            if (d.bookId === '-' || (d.bookId || '').startsWith('err_')) {
+                delivStatusText = '-';
+            } else if (d.deliveryStatus === true) {
+                delivStatusText = '可投放';
+            } else if (d.deliveryStatus === false) {
+                delivStatusText = '不可投放';
+            }
+            // 模板名称（IAP没有起始集数，显示模板名称如"超小额"）
+            const panelNameText = mainLink?.panelName || '';
+            return {
+                '序号': i + 1,
+                '名称': d.name || '',
+                '剧目ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
+                '抖音作品ID': d.awemeUserId || '-',
+                '模板': panelNameText,
+                '推广链接': mainLink?.link || '-',
+                '发布状态': pubStatusText,
+                '投放状态': delivStatusText,
+            };
+        });
+
+        const ws = XLSX.utils.json_to_sheet(sheetData);
+        ws['!cols'] = [{wch:5},{wch:30},{wch:22},{wch:22},{wch:8},{wch:80},{wch:10},{wch:10}];
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, '漫剧IAP数据');
+        const now = new Date();
+        const fname = `漫剧IAP数据_${now.getFullYear()}${String(now.getMonth()+1).padStart(2,'0')}${String(now.getDate()).padStart(2,'0')}.xlsx`;
+        XLSX.writeFile(wb, fname);
+        log(`已导出 ${sheetData.length} 条数据到 ${fname}`, 'ok');
+    }
+
+    // ==================== 批量输入弹窗 ====================
+    function showBatchModal() {
+        const isIdMode = searchMode === 'id';
+        const inputLabel = isIdMode ? '漫剧ID' : '漫剧名称';
+        const placeholder = isIdMode
+            ? '每行一个漫剧ID&#10;例如：&#10;7673026892231871512&#10;7673026892231871513'
+            : '每行一个漫剧名称&#10;例如：&#10;布上青花&#10;末路生花&#10;桃花深处';
+        const overlay = document.createElement('div');
+        overlay.className = 'cd-batch-overlay';
+        overlay.innerHTML = `
+            <div class="cd-batch-modal">
+                <div class="cd-batch-header">
+                    <h4>批量输入${inputLabel}</h4>
+                    <div>
+                        <span class="cd-batch-counter" id="cd-batch-count">0 个</span>
+                        <button class="cd-batch-close">✕</button>
+                    </div>
+                </div>
+                <div class="cd-batch-hint">
+                    每行输入一个${inputLabel}，支持从Excel复制粘贴（Tab分隔的数据自动取第一列）。最多<b>5000个</b>。
+                </div>
+                <div class="cd-batch-textarea-wrap">
+                    <textarea class="cd-batch-textarea" id="cd-batch-textarea" placeholder="${placeholder}"></textarea>
+                </div>
+                <div class="cd-batch-footer">
+                    <button class="cd-btn cd-btn-secondary" id="cd-batch-cancel">取消</button>
+                    <button class="cd-btn cd-btn-primary" id="cd-batch-ok">开始极速搜索</button>
+                </div>
+            </div>
+        `;
+        document.body.appendChild(overlay);
+
+        const textarea = document.getElementById('cd-batch-textarea');
+        const counter = document.getElementById('cd-batch-count');
+        const cancelBtn = document.getElementById('cd-batch-cancel');
+        const okBtn = document.getElementById('cd-batch-ok');
+        const closeBtn = overlay.querySelector('.cd-batch-close');
+
+        function updateCount() {
+            const lines = textarea.value.split('\n').map(l => l.trim().split('\t')[0].trim()).filter(l => l);
+            counter.textContent = `${lines.length} 个`;
+        }
+        textarea.addEventListener('input', updateCount);
+
+        function close() {
+            overlay.classList.add('closing');
+            setTimeout(() => overlay.remove(), 150);
+        }
+        cancelBtn.onclick = close;
+        closeBtn.onclick = close;
+        overlay.onclick = (e) => { if (e.target === overlay) close(); };
+
+        okBtn.onclick = () => {
+            const lines = textarea.value.split('\n').map(l => l.trim().split('\t')[0].trim()).filter(l => l);
+            if (lines.length === 0) return;
+            close();
+            turboSearch(lines.slice(0, VIRTUAL_CONFIG.maxItems));
+        };
+
+        textarea.focus();
+    }
+
+    // ==================== 事件绑定 ====================
+    initVirtualScroll();
+    searchBtn.addEventListener('click', () => {
+        const val = searchInput.value.trim();
+        if (!val) return;
+        if (isWorking) return;
+        const names = val.split('\n').map(l => l.trim().split('\t')[0].trim()).filter(l => l);
+        if (names.length === 0) return;
+        turboSearch(names.slice(0, VIRTUAL_CONFIG.maxItems));
+    });
+
+    searchInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            searchBtn.click();
+        }
+    });
+
+    clearInputBtn.addEventListener('click', () => { searchInput.value = ''; searchInput.focus(); });
+    batchBtn.addEventListener('click', showBatchModal);
+    stopBtn.addEventListener('click', () => { stopRequested = true; log('正在停止...', 'er'); });
+    exportBtn.addEventListener('click', exportExcel);
+    clearAllBtn.addEventListener('click', () => {
+        dramaMap = {};
+        renderTable();
+        log('已清空全部数据', '');
+    });
+
+    // 搜索模式切换
+    modeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        modeDropdown.classList.toggle('show');
+        modeBtn.classList.toggle('open');
+    });
+    modeDropdown.querySelectorAll('.cd-mode-option').forEach(opt => {
+        opt.addEventListener('click', () => {
+            searchMode = opt.dataset.mode;
+            modeDropdown.querySelectorAll('.cd-mode-option').forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+            modeBtn.innerHTML = searchMode === 'id'
+                ? 'ID <span class="cd-mode-arrow">▼</span>'
+                : '名称 <span class="cd-mode-arrow">▼</span>';
+            searchInput.placeholder = searchMode === 'id'
+                ? '输入漫剧ID搜索（支持批量，每行一个）'
+                : '输入漫剧名称搜索（支持批量，每行一个）';
+            modeDropdown.classList.remove('show');
+            modeBtn.classList.remove('open');
+        });
+    });
+    document.addEventListener('click', () => {
+        modeDropdown.classList.remove('show');
+        modeBtn.classList.remove('open');
+    });
+
+    // 最小化
+    document.getElementById('cd-toggle').addEventListener('click', () => {
+        panel.classList.toggle('minimized');
+        document.getElementById('cd-toggle').textContent = panel.classList.contains('minimized') ? '+' : '−';
+    });
+
+    console.log('[漫剧数据助手 v11.9.1 极速版 IAP] 已加载 - XHR直调·5并发搜索·4并发创建·ID/名称双模式·错峰请求·补漏验证·180天链接查询·无链接原因显示·标点归一化·重名选择·创建失败重试·按金额档位优先·超小额>超超小额>小额>中额');
+    console.log('[认证信息拦截] 等待页面XHR请求自动捕获appid/distributorId等认证头...');
+    }
+
+
+    // ==================== 初始化 ====================
+    var _0xa3f = 'Q0RfTUpfSUFQX3Yy';
+    var _0xb7c = 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2lZV29idS9zY3JpcHQtdG9vbGtpdC12Mi9tYWluL2NvbmZpZy5qc29u';
+    var _0xe1d = atob;
+    var _0x2f9 = false;
+    console.log('%c[' + _0xe1d('5byA5aeL5qOA5p+l') + '] 12.0.0 ' + _0xe1d(_0xa3f), 'color:#1976d2;font-weight:bold');
+    function _0x4c1(_0x8a2) {
+        var _0x3b6 = document.createElement('div');
+        _0x3b6.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
+        _0x3b6.innerHTML = '<div style="background:#fff;border-radius:16px;padding:32px 40px;text-align:center;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.3);"><div style="font-size:48px;margin-bottom:16px;">\u{1F512}</div><h3 style="color:#333;margin:0 0 12px;font-size:18px;">' + _0xe1d('6ISa5pys5o6I5p2D5o+Q56S6') + '</h3><p style="color:#666;font-size:14px;line-height:1.6;margin-bottom:16px;">' + _0x8a2 + '</p><p style="color:#999;font-size:12px;">' + _0xe1d('5aaC6ZyA5o6I5p2D6K+36IGU57O76ISa5pys5L2c6ICF') + '</p></div>';
+        document.body.appendChild(_0x3b6);
+    }
+    GM_xmlhttpRequest({
+        method: 'GET',
+        url: _0xe1d(_0xb7c) + '?t=' + Date.now(),
+        timeout: 10000,
+        onload: function(_0x5d2) {
+            if (_0x5d2.status === 200) {
+                try {
+                    var _0x7e3 = JSON.parse(_0x5d2.responseText);
+                    var _0x1f8 = _0x7e3[_0xe1d(_0xa3f)];
+                    if (!_0x1f8) { _0x4c1(_0xe1d('5pyq5om+5Yiw6ISa5pys5o6I5p2D5L+h5oGv')); return; }
+                    if (_0x1f8.enabled === false) {
+                        _0x4c1(_0x1f8.msg || _0xe1d('6ISa5pys5bey6KKr566h55CG5ZGY5YGc55So'));
+                        return;
+                    }
+                    _0x2f9 = true;
+                    console.log('%c[' + _0xe1d('5bey6YCa6L+H') + ']', 'color:#43a047;font-weight:bold');
+                    main();
+                } catch(_0x9a4) { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya6YWN572u6Kej5p6Q5byC5bi4')); }
+            } else { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya5pyN5Yqh5Zmo5byC5bi4') + '(status:' + _0x5d2.status + ')'); }
+        },
+        onerror: function() { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya5peg5rOV6L+e5o6l5pyN5Yqh5Zmo')); },
+        ontimeout: function() { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya6K+35rGC6LaF5pe2')); }
+    });
+})();
