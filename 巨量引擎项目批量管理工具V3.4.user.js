@@ -1,4 +1,4 @@
-﻿// ==UserScript==
+// ==UserScript==
 // @name         巨量引擎项目批量管理工具V3.4
 // @namespace    oceanengine-project-manager
 // @version      11.11.0
@@ -13,8 +13,9 @@
 // @grant        unsafeWindow
 // @connect      raw.githubusercontent.com
 // @connect      gitee.com
-// @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E9%A1%B9%E7%9B%AE%E6%89%B9%E9%87%8F%E7%AE%A1%E7%90%86%E5%B7%A5%E5%85%B7V3.4.user.js
-// @downloadURL https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E9%A1%B9%E7%9B%AE%E6%89%B9%E9%87%8F%E7%AE%A1%E7%90%86%E5%B7%A5%E5%85%B7V3.4.user.js
+// @connect      *
+// @updateURL   https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E9%A1%B9%E7%9B%AE%E6%89%B9%E9%87%8F%E7%AE%A1%E7%90%86%E5%B7%A5%E5%85%B7V3.4.user.js
+// @downloadURL https://gitee.com/mlddr/script-toolkit-v2/raw/master/%E5%B7%A8%E9%87%8F%E5%BC%95%E6%93%8E%E9%A1%B9%E7%9B%AE%E6%89%B9%E9%87%8F%E7%AE%A1%E7%90%86%E5%B7%A5%E5%85%B7V3.4.user.js
 // ==/UserScript==
 
 (function () {
