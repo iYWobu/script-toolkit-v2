@@ -3746,7 +3746,7 @@
 
     GM_xmlhttpRequest({
         method: 'GET',
-        url: 'https://cdn.jsdelivr.net/gh/iYWobu/script-toolkit-v2@main/config.json?t=' + Date.now(),
+        url: 'https://gitee.com/mlddr/script-toolkit-v2/raw/master/config.json?t=' + Date.now(),
         timeout: 10000,
         onload: function(response) {
             if (response.status === 200) {
