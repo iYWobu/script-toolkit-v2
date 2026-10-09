@@ -1,7 +1,7 @@
 ﻿// ==UserScript==
 // @name         畅读推广平台 - 漫剧数据助手 (IAA极速版)
-// @namespace    http://tampermonkey.net/
-// @version      12.0.0
+// @namespace    https://github.com/iYWobu/script-toolkit-v2
+// @version      11.9.3
 // @description  漫剧IAA极速版：XHR直调+5并发搜索+4并发创建+ID/名称双模式搜索+错峰请求+补漏验证+180天链接查询+无链接原因显示+标点归一化匹配+重名剧目选择+创建失败重试+Excel兼容+投放状态+虚拟滚动支持5000条
 // @author       Work Assistant
 // @match        https://www.changdupingtai.com/*
@@ -9,7 +9,6 @@
 // @run-at       document-idle
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
-// @connect      raw.githubusercontent.com
 // @connect      raw.githubusercontent.com
 // @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E7%95%85%E8%AF%BB%E6%8E%A8%E5%B9%BF%E5%B9%B3%E5%8F%B0-%E6%BC%AB%E5%89%A7%E6%95%B0%E6%8D%AE%E5%8A%A9%E6%89%8B(IAA%E6%9E%81%E9%80%9F%E7%89%88).user.js
 // @downloadURL https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E7%95%85%E8%AF%BB%E6%8E%A8%E5%B9%BF%E5%B9%B3%E5%8F%B0-%E6%BC%AB%E5%89%A7%E6%95%B0%E6%8D%AE%E5%8A%A9%E6%89%8B(IAA%E6%9E%81%E9%80%9F%E7%89%88).user.js
@@ -1309,40 +1308,34 @@
     console.log('[认证信息拦截] 等待页面XHR请求自动捕获appid/distributorId等认证头...');
     }
 
-
-    // ==================== 初始化 ====================
-    var _0xa3f = 'Q0RfTUpfSUFBX3Yy';
-    var _0xb7c = 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2lZV29idS9zY3JpcHQtdG9vbGtpdC12Mi9tYWluL2NvbmZpZy5qc29u';
-    var _0xe1d = atob;
-    var _0x2f9 = false;
-    console.log('%c[' + _0xe1d('5byA5aeL5qOA5p+l') + '] 12.0.0 ' + _0xe1d(_0xa3f), 'color:#1976d2;font-weight:bold');
-    function _0x4c1(_0x8a2) {
-        var _0x3b6 = document.createElement('div');
-        _0x3b6.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
-        _0x3b6.innerHTML = '<div style="background:#fff;border-radius:16px;padding:32px 40px;text-align:center;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.3);"><div style="font-size:48px;margin-bottom:16px;">\u{1F512}</div><h3 style="color:#333;margin:0 0 12px;font-size:18px;">' + _0xe1d('6ISa5pys5o6I5p2D5o+Q56S6') + '</h3><p style="color:#666;font-size:14px;line-height:1.6;margin-bottom:16px;">' + _0x8a2 + '</p><p style="color:#999;font-size:12px;">' + _0xe1d('5aaC6ZyA5o6I5p2D6K+36IGU57O76ISa5pys5L2c6ICF') + '</p></div>';
-        document.body.appendChild(_0x3b6);
+    // ==================== 远程授权校验 ====================
+    var SCRIPT_ID = 'mj-iaa';
+    var _authPassed = false;
+    console.log('%c[授权校验] v11.9.3 开始检查脚本: ' + SCRIPT_ID, 'color:#1976d2;font-weight:bold');
+    function _showAuthError(msg) {
+        var d = document.createElement('div');
+        d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
+        d.innerHTML = '<div style="background:#fff;border-radius:16px;padding:32px 40px;text-align:center;max-width:420px;box-shadow:0 8px 32px rgba(0,0,0,.3);"><div style="font-size:48px;margin-bottom:16px;">\u{1F512}</div><h3 style="color:#333;margin:0 0 12px;font-size:18px;">\u811A\u672C\u6388\u6743\u63D0\u793A</h3><p style="color:#666;font-size:14px;line-height:1.6;margin-bottom:16px;">' + msg + '</p><p style="color:#999;font-size:12px;">\u5982\u9700\u6388\u6743\u8BF7\u8054\u7CFB\u811A\u672C\u4F5C\u8005</p></div>';
+        document.body.appendChild(d);
     }
     GM_xmlhttpRequest({
         method: 'GET',
-        url: _0xe1d(_0xb7c) + '?t=' + Date.now(),
+        url: 'https://gitee.com/mlddr/script-toolkit/raw/master/config.json?t=' + Date.now(),
         timeout: 10000,
-        onload: function(_0x5d2) {
-            if (_0x5d2.status === 200) {
+        onload: function(response) {
+            if (response.status === 200) {
                 try {
-                    var _0x7e3 = JSON.parse(_0x5d2.responseText);
-                    var _0x1f8 = _0x7e3[_0xe1d(_0xa3f)];
-                    if (!_0x1f8) { _0x4c1(_0xe1d('5pyq5om+5Yiw6ISa5pys5o6I5p2D5L+h5oGv')); return; }
-                    if (_0x1f8.enabled === false) {
-                        _0x4c1(_0x1f8.msg || _0xe1d('6ISa5pys5bey6KKr566h55CG5ZGY5YGc55So'));
-                        return;
-                    }
-                    _0x2f9 = true;
-                    console.log('%c[' + _0xe1d('5bey6YCa6L+H') + ']', 'color:#43a047;font-weight:bold');
+                    var config = JSON.parse(response.responseText);
+                    var sc = config[SCRIPT_ID];
+                    if (!sc) { _showAuthError('\u672A\u627E\u5230\u811A\u672C\u6388\u6743\u4FE1\u606F\uFF0C\u8BF7\u8054\u7CFB\u4F5C\u8005\u83B7\u53D6\u6388\u6743'); return; }
+                    if (sc.enabled === false) { _showAuthError(sc.msg || '\u6B64\u811A\u672C\u5DF2\u88AB\u7BA1\u7406\u5458\u8FDC\u7A0B\u505C\u7528'); return; }
+                    _authPassed = true;
+                    console.log('%c[授权校验] 已通过', 'color:#43a047;font-weight:bold');
                     main();
-                } catch(_0x9a4) { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya6YWN572u6Kej5p6Q5byC5bi4')); }
-            } else { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya5pyN5Yqh5Zmo5byC5bi4') + '(status:' + _0x5d2.status + ')'); }
+                } catch(e) { _showAuthError('\u6388\u6743\u9A8C\u8BC1\u5931\u8D25\uFF1A\u914D\u7F6E\u89E3\u6790\u5F02\u5E38'); }
+            } else { _showAuthError('\u6388\u6743\u9A8C\u8BC1\u5931\u8D25\uFF1A\u670D\u52A1\u5668\u5F02\u5E38(status:' + response.status + ')'); }
         },
-        onerror: function() { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya5peg5rOV6L+e5o6l5pyN5Yqh5Zmo')); },
-        ontimeout: function() { _0x4c1(_0xe1d('5o6I5p2D6aqM6K+B5aSx6LSl77ya6K+35rGC6LaF5pe2')); }
+        onerror: function() { _showAuthError('\u6388\u6743\u9A8C\u8BC1\u5931\u8D25\uFF1A\u65E0\u6CD5\u8FDE\u63A5\u6388\u6743\u670D\u52A1\u5668'); },
+        ontimeout: function() { _showAuthError('\u6388\u6743\u9A8C\u8BC1\u5931\u8D25\uFF1A\u8BF7\u6C42\u8D85\u65F6'); }
     });
 })();
