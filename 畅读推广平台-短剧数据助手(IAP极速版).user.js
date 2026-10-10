@@ -1173,45 +1173,37 @@
 
         dramas.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh'));
 
-        // 每条链接一行，按模板优先级排列
-        const sheetData = [];
-        let seq = 0;
-        for (const d of dramas) {
-            const links = sortPromoLinksByPriority((d.promoLinks || []).slice());
+        // 每部剧一行，各模板各占一列
+        const templateCols = ['中额', '小额', '超小额', '超超小额'];
+        const sheetData = dramas.map((d, i) => {
+            const links = d.promoLinks || [];
             let pubStatusText = '正常';
             if (d.publishStatus === 3) pubStatusText = '已下架';
             else if (d.publishStatus === 1) pubStatusText = '未发布';
             else if (d.publishStatus === 0 && d.error) pubStatusText = d.error;
 
-            if (links.length === 0) {
-                seq++;
-                sheetData.push({
-                    '序号': seq,
-                    '短剧名称': d.name || '',
-                    '短剧ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
-                    '抖音作品ID': d.awemeUserId || '-',
-                    '模板': '',
-                    '推广链接': '-',
-                    '发布状态': pubStatusText,
+            const row = {
+                '序号': i + 1,
+                '短剧名称': d.name || '',
+                '短剧ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
+                '抖音作品ID': d.awemeUserId || '-',
+            };
+            for (const col of templateCols) {
+                const link = links.find(l => {
+                    const pn = normalizeText(l.panelName || '');
+                    return pn.includes(normalizeText(col));
                 });
-            } else {
-                for (const link of links) {
-                    seq++;
-                    sheetData.push({
-                        '序号': seq,
-                        '短剧名称': d.name || '',
-                        '短剧ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
-                        '抖音作品ID': d.awemeUserId || '-',
-                        '模板': link.panelName || '',
-                        '推广链接': link.link || '-',
-                        '发布状态': pubStatusText,
-                    });
-                }
+                row[col] = link?.link || '-';
             }
-        }
+            row['发布状态'] = pubStatusText;
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(sheetData);
-        ws['!cols'] = [{wch:5},{wch:30},{wch:22},{wch:22},{wch:10},{wch:80},{wch:10}];
+        const colWidths = [{wch:5},{wch:30},{wch:22},{wch:22}];
+        for (let i = 0; i < templateCols.length; i++) colWidths.push({wch:80});
+        colWidths.push({wch:10});
+        ws['!cols'] = colWidths;
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '短剧IAP数据');
         const now = new Date();
