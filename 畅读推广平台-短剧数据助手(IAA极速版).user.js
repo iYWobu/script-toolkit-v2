@@ -1137,45 +1137,34 @@
         // 按名称排序
         dramas.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh'));
 
-        // 每条链接一行，按集数从小到大排列
-        const sheetData = [];
-        let seq = 0;
-        for (const d of dramas) {
-            const links = (d.promoLinks || []).slice().sort((a, b) => (a.startEpisode || 0) - (b.startEpisode || 0));
+        // 每部剧一行，4-10集各占一列
+        const episodes = [4, 5, 6, 7, 8, 9, 10];
+        const sheetData = dramas.map((d, i) => {
+            const links = d.promoLinks || [];
             let statusText = '正常';
             if (d.publishStatus === 3) statusText = '已下架';
             else if (d.publishStatus === 1) statusText = '未发布';
             else if (d.publishStatus === 0 && d.error) statusText = d.error;
 
-            if (links.length === 0) {
-                seq++;
-                sheetData.push({
-                    '序号': seq,
-                    '名称': d.name || '',
-                    'ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
-                    '抖音作品ID': d.awemeUserId || '-',
-                    '集数': '',
-                    '推广链接': '-',
-                    '状态': statusText,
-                });
-            } else {
-                for (const link of links) {
-                    seq++;
-                    sheetData.push({
-                        '序号': seq,
-                        '名称': d.name || '',
-                        'ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
-                        '抖音作品ID': d.awemeUserId || '-',
-                        '集数': link.startEpisode ? `${link.startEpisode}集` : '',
-                        '推广链接': link.link || '-',
-                        '状态': statusText,
-                    });
-                }
+            const row = {
+                '序号': i + 1,
+                '名称': d.name || '',
+                'ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
+                '抖音作品ID': d.awemeUserId || '-',
+            };
+            for (const ep of episodes) {
+                const link = links.find(l => l.startEpisode === ep);
+                row[`${ep}集`] = link?.link || '-';
             }
-        }
+            row['状态'] = statusText;
+            return row;
+        });
 
         const ws = XLSX.utils.json_to_sheet(sheetData);
-        ws['!cols'] = [{wch:5},{wch:30},{wch:22},{wch:22},{wch:8},{wch:80},{wch:10}];
+        const colWidths = [{wch:5},{wch:30},{wch:22},{wch:22}];
+        for (let i = 0; i < episodes.length; i++) colWidths.push({wch:80});
+        colWidths.push({wch:10});
+        ws['!cols'] = colWidths;
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, '数据');
         const now = new Date();
