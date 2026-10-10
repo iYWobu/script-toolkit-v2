@@ -816,34 +816,17 @@
         // 选择第4-10集起广的模板
         const episodeRange = [4, 5, 6, 7, 8, 9, 10];
 
-        // 先查询已有推广链（180天范围），取回已创建的4-10集链接
-        log(`${drama.name} - 查询已有推广链...`, 'inf');
-        const existingLinks = await getPromoLinks(bookId);
-        const existingIn410 = existingLinks.filter(l => episodeRange.includes(l.startEpisode));
-        if (existingIn410.length > 0) {
-            log(`${drama.name} - 已有 ${existingIn410.length} 条推广链（4-10集）`, 'ok');
-        }
-
-        // 找出已有链接的集数，这些不需要再创建
-        const existingEpisodes = new Set(existingIn410.map(l => l.startEpisode));
-
-        // 筛选可创建且在4-10集范围内且尚未有链接的模板
-        const targetTemplates = available.filter(t =>
-            episodeRange.includes(t.startEpisode) && !existingEpisodes.has(t.startEpisode)
-        );
-
-        const allLinks = [...existingIn410];
+        // 1. 先创建可创建的4-10集模板
+        const targetTemplates = available.filter(t => episodeRange.includes(t.startEpisode));
+        const allLinks = [];
         let successCount = 0;
         let failCount = 0;
 
-        if (targetTemplates.length === 0 && existingIn410.length === 0) {
-            log(`${drama.name} - 4-10集无可用模板，跳过创建`, 'war');
+        if (targetTemplates.length === 0) {
+            log(`${drama.name} - 4-10集无可用模板`, 'war');
             drama.error = '4-10集无可用模板';
-            return;
-        }
-
-        if (targetTemplates.length > 0) {
-            log(`${drama.name} - 需创建 ${targetTemplates.length} 个新链接（4-10集），开始批量创建...`, 'inf');
+        } else {
+            log(`${drama.name} - 创建 ${targetTemplates.length} 个新链接（4-10集），开始批量创建...`, 'inf');
             const now = new Date();
             const promoName = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
 
@@ -870,14 +853,29 @@
             }
         }
 
+        // 2. 创建完后再查询已有推广链，补齐未能创建的集数
+        log(`${drama.name} - 查询已有推广链补漏...`, 'inf');
+        const existingLinks = await getPromoLinks(bookId);
+        const existingIn410 = existingLinks.filter(l => episodeRange.includes(l.startEpisode));
+        const existingPromoIds = new Set(allLinks.map(l => l.promoId));
+        let supplemented = 0;
+        for (const link of existingIn410) {
+            if (!existingPromoIds.has(link.promoId)) {
+                allLinks.push(link);
+                supplemented++;
+            }
+        }
+        if (supplemented > 0) {
+            log(`${drama.name} - 从已有推广链补齐 ${supplemented} 条`, 'ok');
+        }
+
         // 按集数排序
         allLinks.sort((a, b) => (a.startEpisode || 0) - (b.startEpisode || 0));
         drama.promoLinks = allLinks;
 
         const totalCount = allLinks.length;
-        const existingCount = existingIn410.length;
         if (totalCount > 0) {
-            log(`${drama.name} - 完成：${existingCount}已有 + ${successCount}新建 = ${totalCount}条链接（${failCount}失败）`, 'ok');
+            log(`${drama.name} - 完成：${successCount}新建 + ${supplemented}补齐 = ${totalCount}条链接（${failCount}失败）`, 'ok');
         } else {
             drama.error = '所有模板创建失败';
             log(`${drama.name} - 所有模板创建失败`, 'er');
