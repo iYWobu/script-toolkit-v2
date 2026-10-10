@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         畅读推广平台 - 短剧数据助手 (IAA极速版)
 // @namespace    https://github.com/iYWobu/script-toolkit-v2
-// @version      11.9.3
-// @description  IAA极速版：XHR直调+5并发搜索+4并发创建+ID/名称双模式搜索+错峰请求+补漏验证+180天链接查询+无链接原因显示+标点归一化匹配+重名剧目选择+创建失败重试+Excel兼容+虚拟滚动支持5000条
+// @version      12.0.0
+// @description  IAA极速版：4-10集全量取链+6并发创建+全部链接导出+XHR直调+ID/名称双模式搜索+180天链接查询+虚拟滚动支持5000条
 // @author       Work Assistant
 // @match        https://www.changdupingtai.com/*
 // @require      https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js
@@ -819,64 +819,52 @@
             return;
         }
 
-        // 严格只选择第2-6集起广的模板（2→3→4→5→6），超出范围不创建
-        const episodePriority = [2, 3, 4, 5, 6];
-        let preferred = null;
-        for (const ep of episodePriority) {
-            preferred = available.find(t => t.startEpisode === ep);
-            if (preferred) break;
-        }
-        // 如果2-6集都没有可用模板，不创建其他集数，直接标记等待查询已有链接
-        if (!preferred) {
-            log(`${drama.name} - 2-6集无可用模板，跳过创建（后续将查询已有链接）`, 'war');
-            drama.error = '2-6集无可用模板';
+        // 选择第4-10集起广的模板，全部创建
+        const episodeRange = [4, 5, 6, 7, 8, 9, 10];
+        const targetTemplates = available.filter(t => episodeRange.includes(t.startEpisode));
+        if (targetTemplates.length === 0) {
+            log(`${drama.name} - 4-10集无可用模板，跳过创建（后续将查询已有链接）`, 'war');
+            drama.error = '4-10集无可用模板';
             return;
         }
 
-        log(`${drama.name} - 选择模板: ${preferred.templateName}（第${preferred.startEpisode}集起广）`, 'inf');
+        log(`${drama.name} - 发现 ${targetTemplates.length} 个可用模板（4-10集），开始批量创建...`, 'inf');
 
-        // 生成推广链名称（日期格式）
         const now = new Date();
         const promoName = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const allLinks = [];
+        let successCount = 0;
+        let failCount = 0;
 
-        // 创建推广链
-        const result = await createPromoLink(bookId, preferred.templateId, promoName);
-        if (result.error) {
-            log(`${drama.name} - 创建失败: ${result.error}`, 'er');
-            drama.error = result.error;
-
-            // 尝试降序选择下一个可用模板（仅限2-6集范围内）
-            const fallback = available.find(t => t.templateId !== preferred.templateId && t.startEpisode > preferred.startEpisode && t.startEpisode <= 6);
-            if (fallback) {
-                log(`${drama.name} - 尝试下一个模板: ${fallback.templateName}（第${fallback.startEpisode}集起广）`, 'inf');
-                const result2 = await createPromoLink(bookId, fallback.templateId, promoName);
-                if (!result2.error) {
-                    drama.promoLinks = [{
-                        promoId: result2.promoId,
-                        promoName: result2.promoName,
-                        link: result2.link,
-                        startEpisode: fallback.startEpisode,
-                        templateId: fallback.templateId,
-                        createTime: now.toISOString()
-                    }];
-                    log(`${drama.name} - 推广链创建成功（备选模板）`, 'ok');
-                    renderTable();
-                    return;
-                }
+        for (const template of targetTemplates) {
+            log(`${drama.name} - 创建第${template.startEpisode}集起广模板: ${template.templateName}`, 'inf');
+            const result = await createPromoLink(bookId, template.templateId, promoName);
+            if (result.error) {
+                log(`${drama.name} - 第${template.startEpisode}集创建失败: ${result.error}`, 'er');
+                failCount++;
+            } else {
+                allLinks.push({
+                    promoId: result.promoId,
+                    promoName: result.promoName,
+                    link: result.link,
+                    startEpisode: template.startEpisode,
+                    templateId: template.templateId,
+                    createTime: now.toISOString()
+                });
+                successCount++;
+                log(`${drama.name} - 第${template.startEpisode}集创建成功`, 'ok');
+                renderTable();
             }
-            return;
+            await sleep(200);
         }
 
-        // 创建成功
-        drama.promoLinks = [{
-            promoId: result.promoId,
-            promoName: result.promoName,
-            link: result.link,
-            startEpisode: preferred.startEpisode,
-            templateId: preferred.templateId,
-            createTime: now.toISOString()
-        }];
-        log(`${drama.name} - 推广链创建成功（第${preferred.startEpisode}集起广）`, 'ok');
+        drama.promoLinks = allLinks;
+        if (successCount > 0) {
+            log(`${drama.name} - 批量创建完成：${successCount}成功，${failCount}失败`, 'ok');
+        } else {
+            drama.error = '所有模板创建失败';
+            log(`${drama.name} - 所有模板创建失败`, 'er');
+        }
         renderTable();
     }
 
@@ -1031,11 +1019,11 @@
         );
 
         if (needCreate.length > 0) {
-            log(`[2/4] 为 ${needCreate.length} 部短剧自动创建推广链（4并发）...`, 'inf');
+            log(`[2/4] 为 ${needCreate.length} 部短剧自动创建推广链（6并发）...`, 'inf');
             let createdCount = 0;
-            await batchConcurrent(needCreate, 4, async (drama, idx) => {
+            await batchConcurrent(needCreate, 6, async (drama, idx) => {
                 if (stopRequested) return;
-                await sleep(idx % 4 * 50);
+                await sleep(idx % 6 * 40);
                 try {
                     await autoCreatePromoLink(drama.bookId);
                     if (drama.promoLinks && drama.promoLinks.length > 0) createdCount++;
@@ -1049,9 +1037,9 @@
                 log(`[2/4] ${failedDramas.length} 部创建失败，2s后重试一次...`, 'inf');
                 await sleep(2000);
                 let retryCount = 0;
-                await batchConcurrent(failedDramas, 4, async (drama, idx) => {
+                await batchConcurrent(failedDramas, 6, async (drama, idx) => {
                     if (stopRequested) return;
-                    await sleep(idx % 4 * 50);
+                    await sleep(idx % 6 * 40);
                     try {
                         await autoCreatePromoLink(drama.bookId);
                         if (drama.promoLinks && drama.promoLinks.length > 0) retryCount++;
@@ -1146,45 +1134,45 @@
         const dramas = Object.values(dramaMap);
         if (dramas.length === 0) return;
 
-        // 按名称排序，和v11.6一致
+        // 按名称排序
         dramas.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh'));
 
-        // 选择主链接：优先第3集，其次第2集，再其次第4集，都没有就取第一个
-        function pickMainLink(links) {
-            if (!links || links.length === 0) return null;
-            // 优先第3集
-            const ep3 = links.find(l => l.startEpisode === 3);
-            if (ep3) return ep3;
-            // 其次第2集
-            const ep2 = links.find(l => l.startEpisode === 2);
-            if (ep2) return ep2;
-            // 再其次第4集
-            const ep4 = links.find(l => l.startEpisode === 4);
-            if (ep4) return ep4;
-            // 都没有就取第一个
-            return links[0];
-        }
-
-        const sheetData = dramas.map((d, i) => {
-            const links = d.promoLinks || [];
-            const mainLink = pickMainLink(links);
-            // 状态：已下架/未发布/已发布
+        // 每条链接一行，按集数从小到大排列
+        const sheetData = [];
+        let seq = 0;
+        for (const d of dramas) {
+            const links = (d.promoLinks || []).slice().sort((a, b) => (a.startEpisode || 0) - (b.startEpisode || 0));
             let statusText = '正常';
             if (d.publishStatus === 3) statusText = '已下架';
             else if (d.publishStatus === 1) statusText = '未发布';
             else if (d.publishStatus === 0 && d.error) statusText = d.error;
-            // 集数：显示起始集数
-            const epText = mainLink?.startEpisode ? `${mainLink.startEpisode}集` : '';
-            return {
-                '序号': i + 1,
-                '名称': d.name || '',
-                'ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
-                '抖音作品ID': d.awemeUserId || '-',
-                '集数': epText,
-                '推广链接': mainLink?.link || '-',
-                '状态': statusText,
-            };
-        });
+
+            if (links.length === 0) {
+                seq++;
+                sheetData.push({
+                    '序号': seq,
+                    '名称': d.name || '',
+                    'ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
+                    '抖音作品ID': d.awemeUserId || '-',
+                    '集数': '',
+                    '推广链接': '-',
+                    '状态': statusText,
+                });
+            } else {
+                for (const link of links) {
+                    seq++;
+                    sheetData.push({
+                        '序号': seq,
+                        '名称': d.name || '',
+                        'ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
+                        '抖音作品ID': d.awemeUserId || '-',
+                        '集数': link.startEpisode ? `${link.startEpisode}集` : '',
+                        '推广链接': link.link || '-',
+                        '状态': statusText,
+                    });
+                }
+            }
+        }
 
         const ws = XLSX.utils.json_to_sheet(sheetData);
         ws['!cols'] = [{wch:5},{wch:30},{wch:22},{wch:22},{wch:8},{wch:80},{wch:10}];
@@ -1320,7 +1308,7 @@
         document.getElementById('cd-toggle').textContent = panel.classList.contains('minimized') ? '+' : '−';
     });
 
-    console.log('[短剧数据助手 v11.9.2 极速版 IAA] 已加载 - XHR直调·5并发搜索·4并发创建·ID/名称双模式·错峰请求·补漏验证·180天链接查询·无链接原因显示·标点归一化·重名选择·创建失败重试·导出优先第3集·2-6集严格限制');
+    console.log('[短剧数据助手 v12.0.0 极速版 IAA] 已加载 - 4-10集全量取链·6并发创建·全部链接导出·XHR直调·5并发搜索·ID/名称双模式·180天链接查询·虚拟滚动');
     console.log('[认证信息拦截] 等待页面XHR请求自动捕获appid/distributorId等认证头...');
     }
 
