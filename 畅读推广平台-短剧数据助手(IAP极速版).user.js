@@ -24,7 +24,7 @@
     function main() {
 
     // ==================== 版本 ====================
-    const VERSION = '11.9.0';
+    const VERSION = '12.0.0';
     const API_BASE = 'https://www.changdupingtai.com/novelsale/distributor';
 
     // ==================== 样式（橙色系，区分漫剧紫色/IAA绿色） ====================
@@ -139,7 +139,7 @@
     panel.innerHTML = `
         <button id="cd-dj-iap-toggle" title="最小化/展开">−</button>
         <div class="cd-dj-iap-header">
-            <h3>短剧数据助手 v11.9.0 极速版 (IAP)</h3>
+            <h3>短剧数据助手 v12.0.0 极速版 (IAP)</h3>
         </div>
         <div class="cd-dj-iap-search-area">
             <div class="cd-dj-iap-search-row">
@@ -169,7 +169,7 @@
                 <button class="cd-dj-iap-btn cd-dj-iap-btn-secondary" id="cd-dj-iap-clear-all-btn" disabled>清空全部</button>
             </div>
         </div>
-        <div class="cd-dj-iap-status-bar" id="cd-dj-iap-status">短剧IAP极速版v11.9.0已启动，等待搜索...</div>
+        <div class="cd-dj-iap-status-bar" id="cd-dj-iap-status">短剧IAP极速版v12.0.0已启动，等待搜索...</div>
     `;
     document.body.appendChild(panel);
 
@@ -1339,7 +1339,7 @@
     // ==================== 远程授权校验 ====================
     var SCRIPT_ID = 'dj-iap';
     var _authPassed = false;
-    console.log('%c[授权校验] v11.9.3 开始检查脚本: ' + SCRIPT_ID, 'color:#1976d2;font-weight:bold');
+    console.log('%c[授权校验] v12.0.0 开始检查脚本: ' + SCRIPT_ID, 'color:#1976d2;font-weight:bold');
     function _showAuthError(msg) {
         var d = document.createElement('div');
         d.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
