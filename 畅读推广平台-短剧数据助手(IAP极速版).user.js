@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         畅读推广平台 - 短剧数据助手 (IAP极速版)
 // @namespace    https://github.com/iYWobu/script-toolkit-v2
-// @version      11.9.3
-// @description  短剧IAP极速版：XHR直调+5并发搜索+4并发创建+ID/名称双模式搜索+错峰请求+补漏验证+180天链接查询+无链接原因显示+标点归一化匹配+重名剧目选择+创建失败重试+名称优先级模板选择+Excel兼容+虚拟滚动支持5000条
+// @version      12.0.0
+// @description  短剧IAP极速版：全模板取链+不可创建模板从已有推广链搜索+6并发创建+全部链接导出+XHR直调+ID/名称双模式搜索+180天链接查询+虚拟滚动支持5000条
 // @author       Work Assistant
 // @match        https://www.changdupingtai.com/*
 // @require      https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js
@@ -833,7 +833,7 @@
         }
 
         let available = templates.filter(t => t.canCreate);
-        if (available.length === 0) {
+        if (available.length === 0 && !templates.some(t => !t.canCreate)) {
             log(`${drama.name} - 所有模板链接已被取完`, 'er');
             drama.error = '链接已被取完';
             return;
@@ -841,43 +841,67 @@
 
         const now = new Date();
         const promoName = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
+        const allLinks = [];
+        let successCount = 0;
+        let failCount = 0;
 
-        // 【短剧IAP特有】模板选择：只按名称优先级，无集数区间
-        const excludeBases = [];
-        for (let attempt = 0; attempt < 5; attempt++) {
-            const templateResult = selectBestTemplate(available, drama.totalEpisodes, excludeBases);
-            if (!templateResult) {
-                if (!drama.error) drama.error = '无可用模板';
-                return;
-            }
-
-            const preferred = templateResult.template;
-            log(`${drama.name} - 尝试模板: ${preferred.templateName}`, 'inf');
-
-            const result = await createPromoLink(bookId, preferred.templateId, promoName);
+        // 为所有可创建的模板创建链接
+        for (const template of available) {
+            log(`${drama.name} - 尝试模板: ${template.templateName}`, 'inf');
+            const result = await createPromoLink(bookId, template.templateId, promoName);
             if (!result.error) {
-                drama.promoLinks = [{
+                allLinks.push({
                     promoId: result.promoId,
                     promoName: result.promoName,
                     link: result.link,
-                    startEpisode: preferred.startEpisode,
-                    templateId: preferred.templateId,
-                    panelName: result.panelName || preferred.templateName,
+                    startEpisode: template.startEpisode,
+                    templateId: template.templateId,
+                    panelName: result.panelName || template.templateName,
                     createTime: now.toISOString()
-                }];
-                log(`${drama.name} - 创建成功（${preferred.templateName}）`, 'ok');
+                });
+                successCount++;
+                log(`${drama.name} - 创建成功（${template.templateName}）`, 'ok');
                 renderTable();
-                return;
+            } else {
+                failCount++;
+                log(`${drama.name} - 模板${template.templateName}创建失败: ${result.error}`, 'er');
             }
+            await sleep(200);
+        }
 
-            // 创建失败，排除当前base继续降级
-            if (!excludeBases.includes(templateResult.base)) {
-                excludeBases.push(templateResult.base);
+        // 对于不可创建的模板，从已有推广链中搜索
+        const cannotCreateTemplates = templates.filter(t => !t.canCreate);
+        if (cannotCreateTemplates.length > 0) {
+            log(`${drama.name} - ${cannotCreateTemplates.length} 个模板不可创建，搜索已有推广链...`, 'inf');
+            const existingLinks = await getPromoLinks(bookId);
+            const existingTemplateIds = new Set(existingLinks.map(l => l.templateId));
+            for (const template of cannotCreateTemplates) {
+                const matched = existingLinks.find(l =>
+                    l.templateId === template.templateId ||
+                    normalizeText(l.panelName || '').includes(normalizeText(template.templateName || ''))
+                );
+                if (matched) {
+                    allLinks.push(matched);
+                    log(`${drama.name} - 模板${template.templateName}从已有链接中找到`, 'ok');
+                }
+            }
+            // 也加入不在模板列表中的已有链接
+            for (const link of existingLinks) {
+                const alreadyIn = allLinks.some(l => l.promoId === link.promoId);
+                if (!alreadyIn) {
+                    allLinks.push(link);
+                }
             }
         }
 
-        drama.error = '所有模板均创建失败';
-        log(`${drama.name} - 所有模板均创建失败`, 'er');
+        drama.promoLinks = sortPromoLinksByPriority(allLinks);
+        if (successCount > 0 || allLinks.length > 0) {
+            log(`${drama.name} - 完成：${successCount}创建成功，${allLinks.length - successCount}从已有链接获取，${failCount}失败`, 'ok');
+        } else {
+            drama.error = '所有模板均创建失败';
+            log(`${drama.name} - 所有模板均创建失败`, 'er');
+        }
+        renderTable();
     }
 
     // ==================== 重名剧目选择弹窗 ====================
@@ -1031,11 +1055,11 @@
         );
 
         if (needCreate.length > 0) {
-            log(`[2/4] 为 ${needCreate.length} 部短剧自动创建推广链（4并发）...`, 'inf');
+            log(`[2/4] 为 ${needCreate.length} 部短剧自动创建推广链（6并发）...`, 'inf');
             let createdCount = 0;
-            await batchConcurrent(needCreate, 4, async (drama, idx) => {
+            await batchConcurrent(needCreate, 6, async (drama, idx) => {
                 if (stopRequested) return;
-                await sleep(idx % 4 * 50);
+                await sleep(idx % 6 * 40);
                 try {
                     await autoCreatePromoLink(drama.bookId);
                     if (drama.promoLinks && drama.promoLinks.length > 0) createdCount++;
@@ -1049,9 +1073,9 @@
                 log(`[2/4] ${failedDramas.length} 部创建失败，2s后重试一次...`, 'inf');
                 await sleep(2000);
                 let retryCount = 0;
-                await batchConcurrent(failedDramas, 4, async (drama, idx) => {
+                await batchConcurrent(failedDramas, 6, async (drama, idx) => {
                     if (stopRequested) return;
-                    await sleep(idx % 4 * 50);
+                    await sleep(idx % 6 * 40);
                     try {
                         await autoCreatePromoLink(drama.bookId);
                         if (drama.promoLinks && drama.promoLinks.length > 0) retryCount++;
@@ -1149,26 +1173,42 @@
 
         dramas.sort((a, b) => (a.name || '').localeCompare(b.name || '', 'zh'));
 
-        const sheetData = dramas.map((d, i) => {
-            const links = d.promoLinks || [];
-            const mainLink = links[0] || null;
-            // 发布状态
+        // 每条链接一行，按模板优先级排列
+        const sheetData = [];
+        let seq = 0;
+        for (const d of dramas) {
+            const links = sortPromoLinksByPriority((d.promoLinks || []).slice());
             let pubStatusText = '正常';
             if (d.publishStatus === 3) pubStatusText = '已下架';
             else if (d.publishStatus === 1) pubStatusText = '未发布';
             else if (d.publishStatus === 0 && d.error) pubStatusText = d.error;
-            // 模板名称（IAP显示模板名称如"超小额"）
-            const panelNameText = mainLink?.panelName || '';
-            return {
-                '序号': i + 1,
-                '短剧名称': d.name || '',
-                '短剧ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
-                '抖音作品ID': d.awemeUserId || '-',
-                '模板': panelNameText,
-                '推广链接': mainLink?.link || '-',
-                '发布状态': pubStatusText,
-            };
-        });
+
+            if (links.length === 0) {
+                seq++;
+                sheetData.push({
+                    '序号': seq,
+                    '短剧名称': d.name || '',
+                    '短剧ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
+                    '抖音作品ID': d.awemeUserId || '-',
+                    '模板': '',
+                    '推广链接': '-',
+                    '发布状态': pubStatusText,
+                });
+            } else {
+                for (const link of links) {
+                    seq++;
+                    sheetData.push({
+                        '序号': seq,
+                        '短剧名称': d.name || '',
+                        '短剧ID': d.bookId && !d.bookId.startsWith('err_') ? d.bookId : '-',
+                        '抖音作品ID': d.awemeUserId || '-',
+                        '模板': link.panelName || '',
+                        '推广链接': link.link || '-',
+                        '发布状态': pubStatusText,
+                    });
+                }
+            }
+        }
 
         const ws = XLSX.utils.json_to_sheet(sheetData);
         ws['!cols'] = [{wch:5},{wch:30},{wch:22},{wch:22},{wch:10},{wch:80},{wch:10}];
@@ -1300,7 +1340,7 @@
         document.getElementById('cd-dj-iap-toggle').textContent = panel.classList.contains('minimized') ? '+' : '−';
     });
 
-    console.log('[短剧数据助手 v11.9.0 极速版 IAP] 已加载 - XHR直调·5并发搜索+4并发创建·ID/名称双模式·错峰请求·补漏验证·180天链接查询·无链接原因显示·标点归一化·重名选择·创建失败重试·虚拟滚动');
+    console.log('[短剧数据助手 v12.0.0 极速版 IAP] 已加载 - 全模板取链·不可创建模板从已有推广链搜索·6并发创建·全部链接导出·XHR直调·5并发搜索·虚拟滚动');
     console.log('[认证信息拦截] 等待页面XHR请求自动捕获appid/distributorId等认证头...');
     }
 
