@@ -809,11 +809,6 @@
         const drama = dramaMap[bookId];
         if (!drama) return;
 
-        if (drama.promoLinks && drama.promoLinks.length > 0) {
-            log(`${drama.name} 已有 ${drama.promoLinks.length} 条推广链，跳过创建`, 'ok');
-            return;
-        }
-
         // 【短剧IAP特有】无投放状态检查
         if (drama.publishStatus !== 2) {
             log(`${drama.name} - ${publishStatusText(drama.publishStatus)}，无法创建推广链`, 'er');
