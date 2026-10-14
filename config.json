@@ -1,14 +1,54 @@
 {
-  "dj-iaa": { "enabled": true, "message": "授权正常" },
-  "dj-iap": { "enabled": true, "message": "授权正常" },
-  "mj-iaa": { "enabled": true, "message": "授权正常" },
-  "mj-iap": { "enabled": true, "message": "授权正常" },
-  "jl-id-tool": { "enabled": true, "message": "授权正常" },
-  "jl-batch-upload": { "enabled": true, "message": "授权正常" },
-  "jl-material-verify": { "enabled": true, "message": "授权正常" },
-  "jl-project-manage": { "enabled": true, "message": "授权正常" },
-  "yx-dj-builder": { "enabled": true, "message": "授权正常" },
-  "yx-global-launch": { "enabled": true, "message": "授权正常" },
-  "material-id-extractor": { "enabled": true, "message": "授权正常" },
-  "auto-recharge": { "enabled": true, "message": "授权正常" }
+    "dj-iaa":  {
+                   "enabled":  true,
+                   "message":  "授权正常"
+               },
+    "dj-iap":  {
+                   "enabled":  true,
+                   "message":  "授权正常"
+               },
+    "mj-iaa":  {
+                   "enabled":  true,
+                   "message":  "授权正常"
+               },
+    "mj-iap":  {
+                   "enabled":  true,
+                   "message":  "授权正常"
+               },
+    "jl-id-tool":  {
+                       "enabled":  true,
+                       "message":  "授权正常"
+                   },
+    "jl-batch-upload":  {
+                            "enabled":  true,
+                            "message":  "授权正常"
+                        },
+    "jl-material-verify":  {
+                               "enabled":  true,
+                               "message":  "授权正常"
+                           },
+    "jl-project-manage":  {
+                              "enabled":  true,
+                              "message":  "授权正常"
+                          },
+    "yx-dj-builder":  {
+                          "enabled":  true,
+                          "message":  "授权正常"
+                      },
+    "yx-global-launch":  {
+                             "enabled":  true,
+                             "message":  "授权正常"
+                         },
+    "material-id-extractor":  {
+                                  "enabled":  true,
+                                  "message":  "授权正常"
+                              },
+    "auto-recharge":  {
+                          "enabled":  true,
+                          "message":  "授权正常"
+                      },
+    "yx-api-fetcher":  {
+                           "message":  "该脚本已被远程停用，请联系作者获取授权",
+                           "enabled":  true
+                       }
 }
