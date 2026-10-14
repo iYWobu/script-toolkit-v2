@@ -46,9 +46,5 @@
     "auto-recharge":  {
                           "enabled":  true,
                           "message":  "授权正常"
-                      },
-    "yx-api-fetcher":  {
-                           "message":  "该脚本已被远程停用，请联系作者获取授权",
-                           "enabled":  true
-                       }
+                      }
 }
