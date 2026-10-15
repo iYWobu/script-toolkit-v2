@@ -14,8 +14,8 @@
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
 // @connect      raw.githubusercontent.com
-// @connect      raw.githubusercontent.com
-// @connect      raw.githubusercontent.com
+// @connect      gitee.com
+// @connect      raw.giteeusercontent.com
 // @connect      cdn.jsdelivr.net
 // @connect      *
 // @updateURL   https://raw.githubusercontent.com/iYWobu/script-toolkit-v2/main/%E8%90%A5%E9%94%80%E4%BA%91-%E6%96%B0%E5%85%A8%E5%9F%9F%E6%8A%95%E6%94%BE%E6%90%AD%E5%BB%BA%E5%8A%A9%E6%89%8B.user.js
@@ -2292,8 +2292,8 @@
 
 
     // ==================== 初始化 ====================
-    var _0xa3f = 'WVhfTkVXX0dMT0JBTF92Mg==';
-    var _0xb7c = 'aHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2lZV29idS9zY3JpcHQtdG9vbGtpdC12Mi9tYWluL2NvbmZpZy5qc29u';
+    var _0xa3f = 'eXgtbmV3LWdsb2JhbC1sYXVuY2g=';
+    var _0xb7c = 'aHR0cHM6Ly9naXRlZS5jb20vbWxkZHIvc2NyaXB0LXRvb2xraXQtdjIvcmF3L21hc3Rlci9jb25maWcuanNvbg==';
     var _0xe1d = atob;
     var _0x2f9 = false;
     console.log('%c[' + _0xe1d('5byA5aeL5qOA5p+l') + '] 12.0.0 ' + _0xe1d(_0xa3f), 'color:#1976d2;font-weight:bold');
