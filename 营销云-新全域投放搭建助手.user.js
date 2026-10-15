@@ -29,14 +29,16 @@
 
     // ==================== 全局配置 ====================
     const CONFIG = {
-        version: '12.0.0',
+        version: '12.1.0',
         defaultRoiCoefficient: '0.98',   // 全域投放：固定ROI系数（非区间）
         accountsPerGroup: 15,
         dramasPerGroup: 8,
-        delayBetweenTasks: 1000,         // 任务间延迟（ms）
-        delayBetweenDramas: 300,         // 剧目查询/素材检查间延迟（ms）
-        maxRetries: 5,                   // 最大重试次数
+        delayBetweenTasks: 2000,         // 任务间延迟（ms），降低QPS
+        delayBetweenDramas: 800,         // 剧目查询/素材检查间延迟（ms），降低QPS
+        maxRetries: 5,                   // 普通错误最大重试次数
         retryDelay: 2000,                // 普通错误重试延迟（ms）
+        submitRetries: 3,                // 任务提交失败重试次数
+        submitRetryDelay: 5000,          // 提交失败重试基础延迟（ms）
         rateLimitDelays: [3000, 5000, 8000, 12000, 20000], // 10006限频递增退避（ms）
         UI_VALUES_KEY: 'omni_dba_v1_ui_values',
     };
@@ -51,6 +53,7 @@
         skipCount: 0,
         failCount: 0,
         skippedDramas: [],
+        failedDramas: [],
         data: {
             accounts: [],
             dramas: [],          // 每项: {name, dramaId, playletId}
@@ -500,8 +503,8 @@
             material_strategy: materialStrategy,
         };
 
-        // 素材检查最多重试5次，每次调用apiRequest自带5次限频退避
-        const maxMaterialRetries = 5;
+        // 素材检查最多重试3次（每次apiRequest自带5次限频退避），减少QPS压力
+        const maxMaterialRetries = 3;
         let lastError = '';
         for (let attempt = 1; attempt <= maxMaterialRetries; attempt++) {
             try {
@@ -600,10 +603,27 @@
 
     // 提交任务
     async function submitTask(taskInfo) {
-        const resp = await apiRequest('/advertising/api/v1/auto_create/task/upsert', 'POST', {
-            create_task_info: taskInfo,
-        });
-        return resp.data?.task_id || null;
+        const maxRetries = CONFIG.submitRetries;
+        const baseDelay = CONFIG.submitRetryDelay;
+        let lastErr = null;
+
+        for (let attempt = 1; attempt <= maxRetries; attempt++) {
+            try {
+                const resp = await apiRequest('/advertising/api/v1/auto_create/task/upsert', 'POST', {
+                    create_task_info: taskInfo,
+                });
+                return resp.data?.task_id || null;
+            } catch (err) {
+                lastErr = err;
+                if (attempt < maxRetries) {
+                    const waitMs = baseDelay * attempt;
+                    log(`⚠️ 提交失败(${err.message})，${(waitMs/1000).toFixed(0)}秒后重试 (${attempt}/${maxRetries})`, 'warn');
+                    await sleep(waitMs);
+                    continue;
+                }
+            }
+        }
+        throw lastErr;
     }
 
     // ==================== 全域投投放子任务调整核心逻辑 ====================
@@ -943,12 +963,18 @@
                         log(`✅ ${names} 全域投放搭建成功 (${validDramas.length}个子任务, ID: ${newTaskId})`, 'success');
                     } else {
                         State.failCount++;
-                        log(`❌ 提交失败`, 'error');
+                        validDramas.forEach(d => State.failedDramas.push({
+                            name: d.name, dramaId: d.dramaId, reason: '返回为空'
+                        }));
+                        log(`❌ 提交失败，返回为空`, 'error');
                     }
                 } catch (err) {
                     if (err.message === '__STOP__') { log('已停止', 'warn'); stopAutomation(); return; }
                     State.failCount++;
-                    log(`❌ 失败: ${err.message}`, 'error');
+                    validDramas.forEach(d => State.failedDramas.push({
+                        name: d.name, dramaId: d.dramaId, reason: err.message
+                    }));
+                    log(`❌ 提交失败: ${err.message}`, 'error');
                 }
 
                 updateProgressUI();
@@ -964,6 +990,14 @@
             log(`📋 以下${State.skippedDramas.length}个剧目被跳过：`, 'warn');
             State.skippedDramas.forEach((d, i) => {
                 log(`  ${i + 1}. 「${d.name}」→ ${d.reason}`, 'warn');
+            });
+        }
+
+        // 输出失败的剧目汇总
+        if (State.failedDramas.length > 0) {
+            log(`❌ 以下${State.failedDramas.length}个剧目搭建失败：`, 'error');
+            State.failedDramas.forEach((d, i) => {
+                log(`  ${i + 1}. 「${d.name}」→ ${d.reason}`, 'error');
             });
         }
 
@@ -2296,7 +2330,7 @@
     var _0xb7c = 'aHR0cHM6Ly9naXRlZS5jb20vbWxkZHIvc2NyaXB0LXRvb2xraXQtdjIvcmF3L21hc3Rlci9jb25maWcuanNvbg==';
     var _0xe1d = atob;
     var _0x2f9 = false;
-    console.log('%c[' + _0xe1d('5byA5aeL5qOA5p+l') + '] 12.0.0 ' + _0xe1d(_0xa3f), 'color:#1976d2;font-weight:bold');
+    console.log('%c[' + _0xe1d('5byA5aeL5qOA5p+l') + '] 12.1.0 ' + _0xe1d(_0xa3f), 'color:#1976d2;font-weight:bold');
     function _0x4c1(_0x8a2) {
         var _0x3b6 = document.createElement('div');
         _0x3b6.style.cssText = 'position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.85);z-index:2147483647;display:flex;align-items:center;justify-content:center;font-family:sans-serif;';
